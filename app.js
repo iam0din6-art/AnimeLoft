@@ -65,7 +65,7 @@ function lsGet(key, fallback = null) {
   try { const v = localStorage.getItem(key); return v === null ? fallback : v; } catch (e) { return fallback; }
 }
 function lsSet(key, value) {
-  try { localStorage.setItem(key, value); } catch (e) { /* storage full or blocked */ }
+  try { localStorage.setItem(key, value); } catch (e) {}
 }
 function lsDel(key) { try { localStorage.removeItem(key); } catch (e) {} }
 function lsJSON(key, fallback) {
@@ -90,7 +90,7 @@ function hashStr(s) {
 const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /* ---------------------------------------------------------------------
-   i18n (strings live in i18n.js → window.LOFT_I18N)
+   i18n
    --------------------------------------------------------------------- */
 const I18N = window.LOFT_I18N || { languages: [{ code: 'en', name: 'English', dir: 'ltr' }], strings: { en: {} } };
 const FONT_FOR = {
@@ -145,13 +145,13 @@ function setLang(code, { rerender = true } = {}) {
   fillLangSelects();
   if (rerender) {
     buildFilterSelects();
-    renderTagline();
-    renderAuth();
-    paintSettings();
-    mascotSay(true);
+    if (typeof renderTagline === 'function') renderTagline();
+    if (typeof renderAuth === 'function') renderAuth();
+    if (typeof paintSettings === 'function') paintSettings();
+    if (typeof mascotSay === 'function') mascotSay(true);
     route();
-    if (isOpen('detail') && state.detail) renderDetail(state.detail);
-    if (isOpen('player')) paintPlayerChrome();
+    if (typeof isOpen === 'function' && isOpen('detail') && state.detail && typeof renderDetail === 'function') renderDetail(state.detail);
+    if (typeof isOpen === 'function' && isOpen('player') && typeof paintPlayerChrome === 'function') paintPlayerChrome();
   }
 }
 
@@ -178,14 +178,14 @@ const state = {
   token: null,
   viewer: null,
   view: 'home',
-  media: new Map(),          // id → media object seen anywhere
-  detail: null,              // full media shown in the detail modal
+  media: new Map(),
+  detail: null,
   epPage: 0,
-  player: null,              // { anime, ep, server, audio }
+  player: null,
   browse: { page: 1, hasNext: false, loading: false, seq: 0 },
   searchSeq: 0,
   hero: { items: [], index: 0, timer: null },
-  stack: [],                 // open layer ids, top is last
+  stack: [],
   lastFocus: [],
   genres: GENRES_FALLBACK,
   alFilter: 'CURRENT',
@@ -193,7 +193,7 @@ const state = {
 };
 
 /* ---------------------------------------------------------------------
-   Toasts (z-70)
+   Toasts
    --------------------------------------------------------------------- */
 function toast(msg, { type = 'info', action = null, ms = 4200 } = {}) {
   const icon = { info: 'ph-info', ok: 'ph-check-circle', error: 'ph-warning-circle' }[type] || 'ph-info';
@@ -208,6 +208,7 @@ function toast(msg, { type = 'info', action = null, ms = 4200 } = {}) {
     el.appendChild(b);
   }
   const box = $('toasts');
+  if (!box) return;
   box.appendChild(el);
   while (box.children.length > 3) box.firstElementChild.remove();
   const dismiss = () => { el.classList.add('out'); setTimeout(() => el.remove(), 320); };
@@ -236,7 +237,7 @@ async function gql(query, variables = {}, { auth = false, cache = true } = {}) {
     try {
       const hit = JSON.parse(sessionStorage.getItem(cacheKey) || 'null');
       if (hit && Date.now() - hit.at < QUERY_TTL) return hit.data;
-    } catch (e) { /* ignore */ }
+    } catch (e) {}
   }
   const headers = { 'Content-Type': 'application/json', Accept: 'application/json' };
   if (useAuth) headers.Authorization = `Bearer ${state.token}`;
@@ -258,7 +259,7 @@ async function gql(query, variables = {}, { auth = false, cache = true } = {}) {
     }
     const json = await res.json().catch(() => ({}));
     if (res.status === 401 || (json.errors || []).some((e) => e.status === 401 || /invalid token/i.test(e.message || ''))) {
-      if (useAuth) { logout(true); toast(t('alExpired'), { type: 'error' }); }
+      if (useAuth && typeof logout === 'function') { logout(true); toast(t('alExpired'), { type: 'error' }); }
       throw new Error('unauthorized');
     }
     if (!res.ok || json.errors) {
@@ -307,7 +308,6 @@ function currentSeason(offset = 0) {
   return { season: seasons[idx], year };
 }
 
-/* Episodes a viewer can actually press play on */
 function releasedEpisodes(m) {
   if (!m) return 0;
   if (m.nextAiringEpisode && m.nextAiringEpisode.episode) return Math.max(0, m.nextAiringEpisode.episode - 1);
@@ -316,13 +316,6 @@ function releasedEpisodes(m) {
 }
 function totalEpisodes(m) {
   return Math.max(m.episodes || 0, releasedEpisodes(m));
-}
-
-function fmtCountdown(sec) {
-  const d = Math.floor(sec / 86400), h = Math.floor((sec % 86400) / 3600), mi = Math.floor((sec % 3600) / 60);
-  if (d > 0) return `${d}d ${h}h`;
-  if (h > 0) return `${h}h ${mi}m`;
-  return `${Math.max(1, mi)}m`;
 }
 
 /* ---------------------------------------------------------------------
@@ -384,8 +377,8 @@ function route() {
   const view = ['home', 'browse', 'list', 'search'].includes(path) ? path : 'home';
   showView(view);
   if (view === 'home') loadHome();
-  if (view === 'browse') { if (!$('browse-grid').children.length) loadBrowse(true); }
-  if (view === 'list') renderList();
+  if (view === 'browse') { if ($('browse-grid') && !$('browse-grid').children.length) loadBrowse(true); }
+  if (view === 'list' && typeof renderList === 'function') renderList();
   if (view === 'search') runSearch(params.get('q') || '');
 }
 
@@ -396,7 +389,8 @@ function showView(view) {
     if (a.dataset.view === view) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
   });
   if (view !== 'home') stopHero(); else startHero();
-  if (view !== 'search' && document.activeElement !== $('search-input')) $('search-input').value = '';
+  const searchInput = $('search-input');
+  if (view !== 'search' && searchInput && document.activeElement !== searchInput) searchInput.value = '';
   document.title = view === 'home' ? 'Anime Loft · open source anime streaming' : `${t(view === 'list' ? 'myList' : view === 'browse' ? 'browse' : 'searchPh')} · Anime Loft`;
 }
 
@@ -436,18 +430,20 @@ function rowShell(id, label) {
 
 let homeData = null;
 async function loadHome(force = false) {
-  renderContinueRail();
+  if (typeof renderContinueRail === 'function') renderContinueRail();
   if (homeData && !force) { paintHome(); return; }
-  $('hero').innerHTML = '<div class="skeleton" aria-hidden="true"></div>';
-  $('home-rows').innerHTML = HOME_ROWS.map((r) => rowShell(r.key, r.label)).join('');
+  const heroEl = $('hero');
+  const homeRowsEl = $('home-rows');
+  if (heroEl) heroEl.innerHTML = '<div class="skeleton" aria-hidden="true"></div>';
+  if (homeRowsEl) homeRowsEl.innerHTML = HOME_ROWS.map((r) => rowShell(r.key, r.label)).join('');
   const cur = currentSeason(0), nxt = currentSeason(1);
   try {
     homeData = await gql(HOME_QUERY, { season: cur.season, year: cur.year, nSeason: nxt.season, nYear: nxt.year, adult: adultVar() });
     HOME_ROWS.forEach((r) => remember(homeData[r.key].media));
     paintHome();
   } catch (e) {
-    $('hero').innerHTML = '';
-    $('home-rows').innerHTML = errorHTML(() => loadHome(true));
+    if (heroEl) heroEl.innerHTML = '';
+    if (homeRowsEl) homeRowsEl.innerHTML = errorHTML(() => loadHome(true));
   }
 }
 
@@ -455,23 +451,22 @@ function paintHome() {
   if (!homeData) return;
   const featured = homeData.trending.media.filter((m) => m.bannerImage).slice(0, 6);
   renderHero(featured.length ? featured : homeData.trending.media.slice(0, 6));
-  $('home-rows').innerHTML = HOME_ROWS.map((r) => rowShell(r.key, r.label)).join('');
+  const homeRowsEl = $('home-rows');
+  if (homeRowsEl) homeRowsEl.innerHTML = HOME_ROWS.map((r) => rowShell(r.key, r.label)).join('');
   HOME_ROWS.forEach((r) => {
     const list = homeData[r.key].media;
-    $('rail-' + r.key).innerHTML = list.length ? list.map((m) => cardHTML(m)).join('') : emptyHTML('ph-calendar-blank', t('noResults'));
+    const rail = $('rail-' + r.key);
+    if (rail) rail.innerHTML = list.length ? list.map((m) => cardHTML(m)).join('') : emptyHTML('ph-calendar-blank', t('noResults'));
   });
   state.homeLoaded = true;
-  if (state.device === 'tv' && !document.querySelector('.layer:not([hidden])')) {
-    const cta = document.querySelector('.hero-slide.on .btn-primary');
-    if (cta && document.activeElement === document.body) cta.focus({ preventScroll: true });
-  }
 }
 
-/* Hero carousel */
 function renderHero(items) {
   state.hero.items = items;
   state.hero.index = 0;
-  if (!items.length) { $('hero').innerHTML = ''; return; }
+  const heroEl = $('hero');
+  if (!heroEl) return;
+  if (!items.length) { heroEl.innerHTML = ''; return; }
   const slides = items.map((m, i) => {
     const desc = stripHtml(m.description || '');
     const meta = [fmtLabel(m.format), m.seasonYear, m.episodes ? t('eps', { n: m.episodes }) : '', m.averageScore ? `★ ${(m.averageScore / 10).toFixed(1)}` : ''].filter(Boolean);
@@ -489,291 +484,16 @@ function renderHero(items) {
     </div>`;
   }).join('');
   const dots = items.map((_, i) => `<button type="button" class="hero-dot${i === 0 ? ' on' : ''}" data-dot="${i}" aria-label="Slide ${i + 1}"></button>`).join('');
-  $('hero').innerHTML = `<div class="hero-stage" id="hero-stage">${slides}<div class="hero-dots">${dots}</div></div>`;
+  heroEl.innerHTML = `<div class="hero-stage" id="hero-stage">${slides}<div class="hero-dots">${dots}</div></div>`;
   const stage = $('hero-stage');
+  if (!stage) return;
   stage.addEventListener('mouseenter', stopHero);
   stage.addEventListener('mouseleave', startHero);
   stage.addEventListener('focusin', stopHero);
   stage.addEventListener('focusout', startHero);
-  // swipe on touch
   let x0 = null;
   stage.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; }, { passive: true });
   stage.addEventListener('touchend', (e) => {
     if (x0 == null) return;
     const dx = e.changedTouches[0].clientX - x0;
-    if (Math.abs(dx) > 48) heroGo(state.hero.index + (dx < 0 ? 1 : -1) * (document.dir === 'rtl' ? -1 : 1));
-    x0 = null;
-  });
-  startHero();
-}
-
-function heroGo(i) {
-  const n = state.hero.items.length;
-  if (!n) return;
-  state.hero.index = (i + n) % n;
-  qsa('.hero-slide').forEach((s, k) => {
-    const on = k === state.hero.index;
-    s.classList.toggle('on', on);
-    if (on) s.removeAttribute('aria-hidden'); else s.setAttribute('aria-hidden', 'true');
-    qsa('button', s).forEach((b) => { if (on) b.removeAttribute('tabindex'); else b.setAttribute('tabindex', '-1'); });
-  });
-  qsa('.hero-dot').forEach((d, k) => {
-    d.classList.remove('on');
-    if (k === state.hero.index) { void d.offsetWidth; d.classList.add('on'); }
-  });
-  startHero();
-}
-function startHero() {
-  stopHero();
-  if (state.view !== 'home' || state.hero.items.length < 2 || reduceMotion()) return;
-  state.hero.timer = setTimeout(() => heroGo(state.hero.index + 1), HERO_INTERVAL);
-}
-function stopHero() { clearTimeout(state.hero.timer); state.hero.timer = null; }
-
-/* ---------------------------------------------------------------------
-   Continue watching / watched episodes / favorites (localStorage)
-   --------------------------------------------------------------------- */
-function getContinue() { return lsJSON(K.cont, {}); }
-function saveContinue(anime, ep, time = 0, duration = 0) {
-  const all = getContinue();
-  const prev = all[anime.id] || {};
-  all[anime.id] = {
-    id: anime.id,
-    title: titleOf(anime),
-    cover: coverOf(anime),
-    format: anime.format || prev.format || '',
-    total: totalEpisodes(anime) || prev.total || 0,
-    ep,
-    time: prev.ep === ep && !time ? prev.time || 0 : time,
-    duration: duration || (prev.ep === ep ? prev.duration : 0) || 0,
-    updated: Date.now()
-  };
-  const ids = Object.values(all).sort((a, b) => b.updated - a.updated).slice(0, 60).map((x) => x.id);
-  Object.keys(all).forEach((id) => { if (!ids.includes(Number(id))) delete all[id]; });
-  lsSetJSON(K.cont, all);
-}
-function removeContinue(id) {
-  const all = getContinue();
-  delete all[id];
-  lsSetJSON(K.cont, all);
-}
-function continueList() { return Object.values(getContinue()).sort((a, b) => b.updated - a.updated); }
-
-function getWatched(id) { return (lsJSON(K.watched, {})[id]) || []; }
-function markWatched(id, ep) {
-  const all = lsJSON(K.watched, {});
-  const set = new Set(all[id] || []);
-  set.add(ep);
-  all[id] = Array.from(set).sort((a, b) => a - b);
-  lsSetJSON(K.watched, all);
-}
-
-function getFavs() { return lsJSON(K.favs, []); }
-function isFav(id) { return getFavs().some((f) => f.id === id); }
-function toggleFav(m) {
-  let favs = getFavs();
-  const on = !favs.some((f) => f.id === m.id);
-  if (on) {
-    favs.unshift({ id: m.id, title: m.title, coverImage: { large: coverOf(m), color: m.coverImage && m.coverImage.color }, format: m.format, seasonYear: m.seasonYear, episodes: m.episodes, averageScore: m.averageScore, status: m.status, isAdult: m.isAdult });
-  } else favs = favs.filter((f) => f.id !== m.id);
-  lsSetJSON(K.favs, favs);
-  toast(t(on ? 'favAdded' : 'favRemoved'), { type: 'ok' });
-  if (state.token) {
-    gql('mutation($id: Int) { ToggleFavourite(animeId: $id) { anime { pageInfo { total } } } }', { id: m.id }, { auth: true, cache: false }).catch(() => {});
-  }
-  return on;
-}
-
-function cwCardHTML(c, { wide = false } = {}) {
-  const pct = c.duration ? Math.min(1, c.time / c.duration) : (c.total ? Math.min(1, c.ep / c.total) : 0);
-  const time = c.time ? ` · ${fmtTime(c.time)}` : '';
-  return `<div class="cw-card${wide ? ' wide' : ''}">
-    <button type="button" class="cw-thumb" data-resume="${c.id}" aria-label="${esc(t('resumeEp', { n: c.ep }))} · ${esc(c.title)}">
-      <img src="${esc(c.cover)}" alt="" loading="lazy">
-    </button>
-    <div class="cw-body">
-      <button type="button" class="card-title clamp-2" data-open="${c.id}" style="text-align:start">${esc(c.title)}</button>
-      <span class="card-sub">${esc(t('episode'))} ${c.ep}${c.total ? ` / ${c.total}` : ''}${esc(time)}</span>
-      <div class="cw-actions">
-        <button type="button" class="btn btn-primary btn-sm" data-resume="${c.id}"><i class="ph-fill ph-play"></i>${esc(t('resume'))}</button>
-        <button type="button" class="btn btn-ghost btn-sm" data-remove-cw="${c.id}" aria-label="${esc(t('remove'))}"><i class="ph ph-trash"></i><span class="hide-mobile">${esc(t('remove'))}</span></button>
-      </div>
-      <div class="cw-bar"><span style="width:${Math.round(pct * 100)}%"></span></div>
-    </div>
-  </div>`;
-}
-function fmtTime(s) {
-  s = Math.floor(s || 0);
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-  return (h ? `${h}:${String(m).padStart(2, '0')}` : `${m}`) + `:${String(sec).padStart(2, '0')}`;
-}
-
-function renderContinueRail() {
-  const list = continueList();
-  const row = $('row-continue');
-  if (state.privacy || !list.length) { row.hidden = true; return; }
-  row.hidden = false;
-  $('rail-continue').className = 'rail rail-wide';
-  $('rail-continue').innerHTML = list.slice(0, 12).map((c) => cwCardHTML(c)).join('');
-}
-
-async function resumeContinue(id) {
-  const c = getContinue()[id];
-  const m = await getMedia(id).catch(() => null);
-  if (!m) { toast(t('loadErr'), { type: 'error' }); return; }
-  openPlayer(m, c ? c.ep : 1);
-}
-
-/* ---------------------------------------------------------------------
-   Search
-   --------------------------------------------------------------------- */
-const SEARCH_QUERY = `query($q: String, $adult: Boolean) {
-  Page(perPage: 40) { media(type: ANIME, search: $q, sort: SEARCH_MATCH, isAdult: $adult) { ${MEDIA_FIELDS} } }
-}`;
-
-async function runSearch(q) {
-  q = q.trim();
-  $('search-h').textContent = t('searchFor', { q });
-  const input = $('search-input');
-  if (document.activeElement !== input) input.value = q;
-  const grid = $('search-grid');
-  if (!q) { grid.innerHTML = emptyHTML('ph-magnifying-glass', t('searchPh')); return; }
-  const seq = ++state.searchSeq;
-  grid.innerHTML = skeletonCards(12);
-  try {
-    const data = await gql(SEARCH_QUERY, { q, adult: adultVar() });
-    if (seq !== state.searchSeq) return;
-    const list = remember(data.Page.media);
-    grid.innerHTML = list.length ? list.map((m) => cardHTML(m)).join('') : emptyHTML('ph-ghost', t('searchEmpty', { q }));
-  } catch (e) {
-    if (seq === state.searchSeq) grid.innerHTML = errorHTML(() => runSearch(q));
-  }
-}
-
-const onSearchInput = debounce((q) => {
-  q = q.trim();
-  if (q.length < 2) return;
-  const hash = '#/search?q=' + encodeURIComponent(q);
-  if (state.view === 'search') { history.replaceState(history.state, '', hash); route(); }
-  else location.hash = hash;
-}, 420);
-
-/* ---------------------------------------------------------------------
-   Browse: categories & filters
-   --------------------------------------------------------------------- */
-const BROWSE_QUERY = `query($page: Int, $season: MediaSeason, $seasonYear: Int, $from: FuzzyDateInt, $to: FuzzyDateInt, $format: MediaFormat, $genre: String, $sort: [MediaSort], $adult: Boolean) {
-  Page(page: $page, perPage: 30) {
-    pageInfo { hasNextPage total }
-    media(type: ANIME, season: $season, seasonYear: $seasonYear, startDate_greater: $from, startDate_lesser: $to, format: $format, genre: $genre, sort: $sort, isAdult: $adult) { ${MEDIA_FIELDS} }
-  }
-}`;
-
-function buildFilterSelects() {
-  const yearSel = $('f-year');
-  const keepYear = yearSel.value;
-  const now = new Date().getFullYear() + 1;
-  let html = `<option value="">${esc(t('any'))}</option>`;
-  for (let y = now; y >= 1960; y--) html += `<option value="${y}">${y}</option>`;
-  yearSel.innerHTML = html;
-  yearSel.value = keepYear;
-
-  const genreSel = $('f-genre');
-  const keepGenre = genreSel.value;
-  const genres = state.genres.filter((g) => state.nsfw || g !== 'Hentai');
-  genreSel.innerHTML = `<option value="">${esc(t('any'))}</option>` + genres.map((g) => `<option value="${esc(g)}">${esc(g)}</option>`).join('');
-  genreSel.value = genres.includes(keepGenre) ? keepGenre : '';
-
-  $('genre-chips').innerHTML = QUICK_GENRES.map((g) => `<button type="button" class="chip" data-genre="${esc(g)}" aria-pressed="${genreSel.value === g}">${esc(g)}</button>`).join('');
-}
-
-async function loadGenres() {
-  try {
-    const d = await gql('{ GenreCollection }');
-    if (Array.isArray(d.GenreCollection) && d.GenreCollection.length) { state.genres = d.GenreCollection; buildFilterSelects(); }
-  } catch (e) { /* fallback list stays */ }
-}
-
-function browseVars(page) {
-  const year = Number($('f-year').value) || null;
-  const season = $('f-season').value || null;
-  return {
-    page,
-    season,
-    seasonYear: season && year ? year : null,
-    from: !season && year ? year * 10000 : null,
-    to: !season && year ? (year + 1) * 10000 : null,
-    format: $('f-format').value || null,
-    genre: $('f-genre').value || null,
-    sort: [$('f-sort').value || 'POPULARITY_DESC'],
-    adult: adultVar()
-  };
-}
-
-async function loadBrowse(reset) {
-  const b = state.browse;
-  if (reset) { b.page = 1; b.seq++; }
-  const seq = b.seq;
-  const grid = $('browse-grid');
-  const more = $('browse-more');
-  if (reset) grid.innerHTML = skeletonCards(18);
-  b.loading = true;
-  more.disabled = true;
-
-  try {
-    const vars = browseVars(b.page);
-    const data = await gql(BROWSE_QUERY, vars);
-    if (seq !== b.browseSeq) { b.loading = false; return; }
-    const pageInfo = data.Page.pageInfo;
-    const list = remember(data.Page.media);
-    b.hasNext = pageInfo.hasNextPage;
-
-    if (reset) {
-      grid.innerHTML = list.length ? list.map((m) => cardHTML(m)).join('') : emptyHTML('ph-magnifying-glass', t('noResults'));
-    } else if (list.length) {
-      grid.insertAdjacentHTML('beforeend', list.map((m) => cardHTML(m)).join(''));
-    }
-    more.hidden = !b.hasNext;
-  } catch (e) {
-    if (reset && seq === b.browseSeq) grid.innerHTML = errorHTML(() => loadBrowse(true));
-    else toast(t('loadErr'), { type: 'error' });
-  } finally {
-    b.loading = false;
-    more.disabled = false;
-  }
-}
-
-async function getMedia(id) {
-  if (state.media.has(id)) return state.media.get(id);
-  const data = await gql(`query($id: Int) { Media(id: $id) { ${MEDIA_FIELDS} description siteUrl trailer { id site } relations { edges { relationType node { ${MEDIA_FIELDS} } } } characters(perPage: 10, sort: [ROLE, FAVOURITES_DESC]) { nodes { name { userPreferred } image { large } } } } }`, { id });
-  if (!data || !data.Media) throw new Error('not found');
-  remember([data.Media]);
-  return data.Media;
-}
-
-// =====================================================================
-   Initialization & Event Listeners
-   ===================================================================== */
-function initApp() {
-  state.lang = detectLang();
-  fillLangSelects();
-  applyI18n();
-  loadGenres();
-
-  // Event Listeners globais de navegação e busca
-  const searchInput = $('search-input');
-  if (searchInput) {
-    searchInput.addEventListener('input', (e) => onSearchInput(e.target.value));
-    searchInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        const q = e.target.value.trim();
-        if (q) { location.hash = '#/search?q=' + encodeURIComponent(q); }
-      }
-    });
-  }
-
-  window.addEventListener('hashchange', route);
-  if (!location.hash) location.hash = '#/home';
-  else route();
-}
-
-document.addEventListener('DOMContentLoaded', initApp);
+    if (Math.abs(dx) > 48) heroGo(state.hero.index + (dx < 0 ? 1 : -1
