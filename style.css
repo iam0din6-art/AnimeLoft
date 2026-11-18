@@ -369,3 +369,60 @@ html[data-theme="oled"] #featured-banner::after { background: linear-gradient(to
 .player-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
 .player-actions .btn-ghost { padding: .5rem 1rem; font-size: .8rem; text-decoration: none; }
 .player-actions .btn-ghost:disabled { opacity: .35; cursor: not-allowed; }
+
+/* ================= v9: onboarding, densidade por dispositivo, provedores, espaçamento do main ================= */
+:root { --nav-h: 7rem; }
+@media (min-width: 1024px) { :root { --nav-h: 4rem; } }
+#app-main { padding-top: calc(var(--nav-h) + .75rem); } /* --nav-h é medido pelo JS (ResizeObserver); estes valores são o plano B */
+
+.onboarding { display: none; align-items: center; justify-content: center; padding: 1.25rem; overflow-y: auto; background: radial-gradient(ellipse at top, rgba(99,102,241,.22), transparent 60%), rgba(7,8,10,.97); backdrop-filter: blur(14px); }
+.onboarding:not(.hidden) { display: flex; }
+.ob-card { width: 100%; max-width: 46rem; display: flex; flex-direction: column; align-items: center; gap: 1.1rem; padding: 2rem 1.25rem; text-align: center; animation: rise .35s ease; }
+.ob-card h2 { font-size: clamp(1.5rem, 4vw, 2.2rem); font-weight: 800; letter-spacing: -.02em; color: #fff; }
+.ob-sub { max-width: 30rem; font-size: .95rem; line-height: 1.6; color: #c4c8d4; }
+.ob-options { width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 1rem; margin-top: .6rem; }
+.ob-option { position: relative; display: flex; flex-direction: column; align-items: center; gap: .45rem; padding: 1.6rem 1rem 1.3rem; border-radius: 20px; background: var(--surface-2); border: 1px solid var(--line); color: #fff; transition: transform .2s, border-color .2s, background .2s; }
+.ob-option:hover, .ob-option:focus-visible { transform: scale(1.04); border-color: var(--accent); background: #1d2030; }
+.ob-emoji { font-size: 2.6rem; line-height: 1; }
+.ob-option b { font-size: 1rem; font-weight: 800; }
+.ob-option small { font-size: .78rem; color: var(--muted); }
+.ob-rec { display: none; position: absolute; top: .6rem; right: .6rem; padding: .15rem .55rem; border-radius: 999px; background: var(--accent); font-size: .65rem; font-style: normal; font-weight: 800; color: #fff; }
+.ob-option.rec .ob-rec { display: inline-block; }
+.ob-option.rec { border-color: rgba(129,140,248,.7); }
+.ob-langs { display: flex; flex-wrap: wrap; justify-content: center; gap: .5rem; }
+.ob-foot { font-size: .8rem; color: var(--muted); }
+
+/* Provedores de stream (Configurações) */
+.prov-list { display: flex; flex-direction: column; gap: .5rem; margin-top: .6rem; }
+.prov-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .6rem .9rem; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line); }
+.prov-def { display: flex; align-items: center; gap: .7rem; flex: 1; font-size: .88rem; font-weight: 700; color: #fff; cursor: pointer; }
+.prov-def input { width: 18px; height: 18px; accent-color: var(--accent); }
+.prov-def input:disabled + span { opacity: .45; }
+
+/* Densidade e comportamento por dispositivo (html[data-device]) */
+html[data-device="pc"] { --card-min: 10.5rem; --carousel-card: 11.5rem; }
+html[data-device="tv"] { --card-min: 13.5rem; --carousel-card: 15rem; font-size: 125%; }
+html[data-device="mobile"] { --card-min: 8.5rem; --carousel-card: 8.75rem; }
+html[data-device] #popular-grid, html[data-device] #search-results-grid, html[data-device] #filter-grid,
+html[data-device] #lib-favs, html[data-device] #lib-list { grid-template-columns: repeat(auto-fill, minmax(var(--card-min), 1fr)); }
+html[data-device] .carousel > * { width: var(--carousel-card); }
+
+/* TV / console: foco grande e visível, alvos maiores, sem setas de mouse */
+html[data-device="tv"] :focus-visible { outline: 4px solid #fff; outline-offset: 4px; border-radius: 12px; }
+html[data-device="tv"] .anime-card:focus-visible, html[data-device="tv"] .continue-card:focus-visible, html[data-device="tv"] .cat-card:focus-visible { transform: scale(1.08); z-index: 3; }
+html[data-device="tv"] .car-btn { display: none; }
+html[data-device="tv"] .nav-tab { padding: .7rem .9rem; }
+html[data-device="tv"] .btn-nav, html[data-device="tv"] .btn-ghost, html[data-device="tv"] .btn-primary { padding: .8rem 1.3rem; }
+html[data-device="tv"] .genre-chip, html[data-device="tv"] .srv-btn, html[data-device="tv"] .pill { padding: .6rem 1.1rem; }
+
+/* Celular / tablet: banner menor, alvos de toque de 40px, sem efeitos de hover */
+html[data-device="mobile"] #featured-banner { height: 56vh; min-height: 340px; }
+html[data-device="mobile"] .banner-title { font-size: 1.9rem; }
+html[data-device="mobile"] .banner-desc { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+html[data-device="mobile"] .car-btn { display: none; }
+html[data-device="mobile"] .anime-card:hover, html[data-device="mobile"] .continue-card:hover, html[data-device="mobile"] .cat-card:hover { transform: none; }
+html[data-device="mobile"] .genre-chip, html[data-device="mobile"] .srv-btn, html[data-device="mobile"] .pill { min-height: 40px; }
+html[data-device="mobile"] .mascot-avatar { width: 52px; height: 52px; border-radius: 16px; }
+html[data-device="mobile"] .mascot-bubble { width: 16rem; }
+html[data-device="mobile"] .cat-card { min-height: 5.5rem; }
+@media (max-width: 640px) { .btn-nav { padding: .45rem .7rem; } }
