@@ -30,12 +30,12 @@ const DEFAULT_SERVERS = {
   maintenance: false,
   message: { en: 'We are improving Anime Loft. Please come back in a few minutes.' },
   servers: [
-    { id: 'vidsrcme',  label: 'Vidsrc.me',   type: 'embed', enabled: true, url: 'https://vidsrc.me/embed/anime?mal={malId}&ep={ep}' },
-    { id: 'vidsrcnet', label: 'Vidsrc.net',  type: 'embed', enabled: true, url: 'https://vidsrc.net/embed/anime?mal={malId}&ep={ep}' },
-    { id: 'vidlink',   label: 'VidLink Pro', type: 'embed', enabled: true, url: 'https://vidlink.pro/anime/{malId}/{ep}/{audio}' },
-    { id: 'multiembed',label: 'MultiEmbed',  type: 'embed', enabled: true, url: 'https://multiembed.mov/?video_id={malId}&tmdb=0' },
-    { id: 'megaplay',  label: 'MegaPlay',    type: 'embed', enabled: true, url: 'https://megaplay.buzz/stream/ani/{anilistId}/{ep}/{audio}' },
-    { id: 'vidsrccc',  label: 'Vidsrc.cc',   type: 'embed', enabled: true, url: 'https://vidsrc.cc/v2/embed/anime/{anilistId}/{ep}/{audio}' }
+    { id: 'megaplay',  label: 'MegaPlay',    type: 'embed', enabled: true,  url: 'https://megaplay.buzz/stream/ani/{anilistId}/{ep}/{audio}' },
+    { id: 'vidsrccc',  label: 'Vidsrc.cc',   type: 'embed', enabled: true,  url: 'https://vidsrc.cc/v2/embed/anime/{anilistId}/{ep}/{audio}' },
+    { id: 'vidsrcme',  label: 'Vidsrc.me',   type: 'embed', enabled: false, url: 'https://vidsrc.me/embed/anime?mal={malId}&ep={ep}' },
+    { id: 'vidsrcnet', label: 'Vidsrc.net',  type: 'embed', enabled: false, url: 'https://vidsrc.net/embed/anime?mal={malId}&ep={ep}' },
+    { id: 'vidlink',   label: 'VidLink Pro', type: 'embed', enabled: false, url: 'https://vidlink.pro/anime/{malId}/{ep}/{audio}' },
+    { id: 'multiembed',label: 'MultiEmbed',  type: 'embed', enabled: false, url: 'https://multiembed.mov/?video_id={malId}&tmdb=0' }
   ]
 };
 
@@ -846,24 +846,17 @@ function buildServerURL(server, media, ep, audio) {
 function pickPlayableServer(media, ep, preferredId) {
   const list = enabledServers();
   if (!list.length) return null;
-  // respeita preferência do usuário primeiro
-  if (preferredId) {
-    const pref = list.find(s => s.id === preferredId);
-    if (pref && buildServerURL(pref, media, ep, state.audio || 'sub')) {
-      return { server: pref, url: buildServerURL(pref, media, ep, state.audio || 'sub') };
-    }
-  }
-  // depois o default salvo
-  const def = state.prefs.default;
-  if (def) {
-    const d = list.find(s => s.id === def);
-    if (d && buildServerURL(d, media, ep, state.audio || 'sub')) {
-      return { server: d, url: buildServerURL(d, media, ep, state.audio || 'sub') };
-    }
-  }
-  // senão o primeiro que funcionar
-  for (const s of list) {
-    const url = buildServerURL(s, media, ep, state.audio || 'sub');
+  const audio = state.audio || 'sub';
+
+  // ordem de prioridade: preferido → default → megaplay → vidsrccc → resto
+  const order = [];
+  if (preferredId) { const p = list.find(s => s.id === preferredId); if (p) order.push(p); }
+  if (state.prefs.default) { const d = list.find(s => s.id === state.prefs.default); if (d && !order.includes(d)) order.push(d); }
+  ['megaplay','vidsrccc'].forEach(id => { const s = list.find(x => x.id === id); if (s && !order.includes(s)) order.push(s); });
+  list.forEach(s => { if (!order.includes(s)) order.push(s); });
+
+  for (const s of order) {
+    const url = buildServerURL(s, media, ep, audio);
     if (url) return { server: s, url };
   }
   return null;
