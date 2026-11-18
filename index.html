@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Anime Loft</title>
+
+  <meta name="theme-color" content="#07080a">
+  <meta name="description" content="Anime Loft - assista animes online">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/jpeg" href="logo.jpg">
+  <link rel="apple-touch-icon" href="logo.jpg">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: { colors: { bg: '#07080a', card: '#16181d', accent: '#6366f1' } } } };
+  </script>
+
+  <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="bg-bg antialiased min-h-screen">
+
+  <!-- NAVBAR -->
+  <header id="navbar" class="fixed top-0 inset-x-0 z-40">
+    <nav class="max-w-[1500px] mx-auto px-4 md:px-8 py-2 md:py-0 md:h-16 flex flex-wrap md:flex-nowrap items-center gap-x-3 gap-y-1 md:gap-6">
+      <a href="#" id="logo" class="logo shrink-0"><img src="logo.jpg" alt="Anime Loft" class="w-8 h-8 rounded-lg object-cover border border-white/15" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'"><span class="logo-fallback" style="display:none" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span><b>ANIME<span>LOFT</span></b></a>
+
+      <div class="nav-tabs" role="tablist">
+        <button type="button" id="tab-home" class="nav-tab active" data-view="home" data-i18n="home"></button>
+        <button type="button" id="tab-cats" class="nav-tab" data-view="cats" data-i18n="categories"></button>
+        <button type="button" id="btn-my-list" class="nav-tab" data-view="list" data-i18n="myList"></button>
+      </div>
+
+      <form id="search-form" class="search" role="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <label for="search-input" class="sr-only">Search</label>
+        <input id="search-input" type="search" autocomplete="off" data-i18n-ph="searchPh">
+      </form>
+
+      <div class="flex items-center gap-2 shrink-0 ml-auto md:ml-0">
+        <a id="btn-github" class="btn-nav github" data-github href="#" target="_blank" rel="noopener noreferrer" aria-label="GitHub"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg><span class="hidden xl:inline">GitHub</span></a>
+        <a id="btn-discord" class="btn-nav discord" href="https://discord.gg/3qeKkseWSs" target="_blank" rel="noopener noreferrer" aria-label="Discord"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/><path d="M9 11h.01M15 11h.01"/></svg><span class="hidden lg:inline">Discord</span></a>
+        <button id="btn-surprise" type="button" class="btn-nav"><span aria-hidden="true">&#127922;</span><span class="hidden sm:inline" data-i18n="surprise"></span></button>
+        <button id="btn-settings" type="button" class="btn-nav" aria-label="Settings" title="Settings">&#9881;&#65039;</button>
+        <label class="sr-only" for="lang-select">Language</label>
+        <select id="lang-select" class="field lang">
+          <option value="pt">Português</option>
+          <option value="en">English</option>
+          <option value="es">Español</option>
+          <option value="bn">বাংলা</option>
+        </select>
+        <div class="profile">
+          <button id="btn-login" type="button" class="btn-nav accent"></button>
+          <div id="profile-menu" class="profile-menu hidden" role="menu">
+            <span id="profile-name" class="profile-name"></span>
+            <button id="btn-logout" type="button" role="menuitem" data-i18n="logout"></button>
+          </div>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <main class="pt-28 lg:pt-16">
+    <!-- HOME -->
+    <div id="home-view">
+      <section id="featured-banner" aria-label="Featured"></section>
+
+      <div class="wrap pt-6 pb-16 space-y-12">
+        <section id="continue-section" class="pt-8">
+          <h2 class="section-title" data-i18n="continueWatching"></h2>
+          <div id="continue-list" class="continue-list"></div>
+        </section>
+
+        <section id="trending-section">
+          <h2 class="section-title" data-i18n="trending"></h2>
+          <div class="carousel-wrap">
+            <button type="button" class="car-btn prev" data-target="trending-carousel" data-dir="-1" aria-label="Previous">&#8249;</button>
+            <div id="trending-carousel" class="carousel"></div>
+            <button type="button" class="car-btn next" data-target="trending-carousel" data-dir="1" aria-label="Next">&#8250;</button>
+          </div>
+        </section>
+
+        <section id="releases-section">
+          <h2 class="section-title" data-i18n="releases"></h2>
+          <div class="carousel-wrap">
+            <button type="button" class="car-btn prev" data-target="releases-carousel" data-dir="-1" aria-label="Previous">&#8249;</button>
+            <div id="releases-carousel" class="carousel"></div>
+            <button type="button" class="car-btn next" data-target="releases-carousel" data-dir="1" aria-label="Next">&#8250;</button>
+          </div>
+        </section>
+
+        <section id="recent-section">
+          <h2 class="section-title" data-i18n="recentEps"></h2>
+          <div class="carousel-wrap">
+            <button type="button" class="car-btn prev" data-target="recent-carousel" data-dir="-1" aria-label="Previous">&#8249;</button>
+            <div id="recent-carousel" class="carousel"></div>
+            <button type="button" class="car-btn next" data-target="recent-carousel" data-dir="1" aria-label="Next">&#8250;</button>
+          </div>
+        </section>
+
+        <section id="acclaimed-section">
+          <h2 class="section-title" data-i18n="acclaimed"></h2>
+          <div class="carousel-wrap">
+            <button type="button" class="car-btn prev" data-target="acclaimed-carousel" data-dir="-1" aria-label="Previous">&#8249;</button>
+            <div id="acclaimed-carousel" class="carousel"></div>
+            <button type="button" class="car-btn next" data-target="acclaimed-carousel" data-dir="1" aria-label="Next">&#8250;</button>
+          </div>
+        </section>
+
+        <section id="popular-section">
+          <h2 id="popular-title" class="section-title"></h2>
+          <div id="genre-bar" class="genre-bar"></div>
+          <div id="popular-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4"></div>
+        </section>
+      </div>
+    </div>
+
+    <!-- CATEGORIAS -->
+    <section id="categories-view" class="hidden wrap pt-6 pb-16">
+      <h2 class="section-title" data-i18n="categories"></h2>
+
+      <h3 class="cat-heading" data-i18n="filters"></h3>
+      <div id="filters" class="filters-grid">
+        <label class="ctl"><span data-i18n="year"></span><select id="f-year" class="field"></select></label>
+        <label class="ctl"><span data-i18n="fSeason"></span><select id="f-season" class="field"></select></label>
+        <label class="ctl"><span data-i18n="format"></span><select id="f-format" class="field"></select></label>
+        <label class="ctl"><span data-i18n="genres"></span><select id="f-genre" class="field"></select></label>
+        <button id="f-clear" type="button" class="btn-ghost" data-i18n="fClear"></button>
+      </div>
+      <div id="filter-results" class="hidden">
+        <div id="filter-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-4"></div>
+      </div>
+
+      <h3 class="cat-heading" data-i18n="genres"></h3>
+      <div id="cat-genres" class="cat-grid"></div>
+      <h3 class="cat-heading" data-i18n="catFormats"></h3>
+      <div id="cat-formats" class="cat-grid"></div>
+    </section>
+
+    <!-- MINHA LISTA: histórico, favoritos e lista do AniList -->
+    <section id="library-view" class="hidden wrap pt-6 pb-16">
+      <h2 class="section-title" data-i18n="myList"></h2>
+
+      <h3 class="cat-heading" data-i18n="continueWatching"></h3>
+      <div id="lib-continue" class="continue-list"></div>
+
+      <h3 class="cat-heading" data-i18n="favorites"></h3>
+      <div id="lib-favs" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4"></div>
+
+      <h3 class="cat-heading" data-i18n="aniListList"></h3>
+      <div id="lib-filter" class="genre-bar"></div>
+      <div id="lib-list" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4"></div>
+    </section>
+
+    <!-- BUSCA -->
+    <section id="search-results-section" class="hidden wrap pt-6 pb-16" aria-live="polite">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="section-title" style="margin-bottom:0"></h2>
+        <button id="btn-clear-search" type="button" data-i18n="clear"></button>
+      </div>
+      <div id="search-results-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4"></div>
+    </section>
+  </main>
+
+  <!-- MODAL: DETALHES DO ANIME -->
+  <div id="anime-modal" class="modal hidden fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="anime-title">
+    <div class="min-h-full flex items-start justify-center sm:p-8">
+      <div class="modal-panel detail">
+        <div class="detail-bg"><img id="anime-banner" src="" alt=""></div>
+        <button id="anime-modal-close" type="button" class="icon-btn close" aria-label="Close">&#10005;</button>
+
+        <div class="detail-body">
+          <img id="anime-cover" class="detail-cover" src="" alt="">
+          <div>
+            <div class="detail-head">
+              <h2 id="anime-title" class="detail-title"></h2>
+              <button id="btn-favorite" type="button" class="icon-btn fav" aria-pressed="false">&#9825;</button>
+            </div>
+            <div id="anime-meta" class="info-grid"></div>
+            <p id="anime-synopsis" class="detail-synopsis"></p>
+            <div class="detail-actions">
+              <button id="btn-trailer" type="button" class="btn-ghost hidden">&#9654; <span data-i18n="trailer"></span></button>
+            </div>
+
+            <div id="anilist-controls" class="anilist-box">
+              <span class="anilist-label" data-i18n="myListLabel"></span>
+              <select id="anilist-status" class="field">
+                <option value="CURRENT" data-i18n="s_CURRENT"></option>
+                <option value="PLANNING" data-i18n="s_PLANNING"></option>
+                <option value="COMPLETED" data-i18n="s_COMPLETED"></option>
+                <option value="PAUSED" data-i18n="s_PAUSED"></option>
+                <option value="DROPPED" data-i18n="s_DROPPED"></option>
+              </select>
+              <label class="anilist-ep"><span data-i18n="episode"></span>
+                <input id="anilist-progress" class="field" type="number" min="0" value="0">
+              </label>
+              <button id="btn-save-anilist" type="button" class="btn-primary" data-i18n="saveAniList"></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-eps">
+          <h3 class="section-title" data-i18n="episodes"></h3>
+          <div id="episodes-grid" class="episodes-grid"></div>
+        </div>
+
+        <div id="reviews-section" class="detail-eps">
+          <h3 class="section-title" data-i18n="reviews"></h3>
+          <div class="review-summary">
+            <span id="review-avg" class="review-avg">-</span>
+            <div><div id="review-avg-stars" class="stars"></div><span id="review-count" class="review-count"></span></div>
+          </div>
+          <div class="review-form">
+            <span class="review-label" data-i18n="yourRating"></span>
+            <div id="star-input" class="stars input" role="group">
+              <button type="button" data-star="1" aria-label="1">&#9733;</button>
+              <button type="button" data-star="2" aria-label="2">&#9733;</button>
+              <button type="button" data-star="3" aria-label="3">&#9733;</button>
+              <button type="button" data-star="4" aria-label="4">&#9733;</button>
+              <button type="button" data-star="5" aria-label="5">&#9733;</button>
+            </div>
+            <textarea id="review-text" class="field" rows="3" maxlength="500" data-i18n-ph="commentPh"></textarea>
+            <button id="btn-review" type="button" class="btn-primary" data-i18n="send"></button>
+          </div>
+          <div id="review-list" class="review-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: PLAYER -->
+  <div id="player-modal" class="modal hidden fixed inset-0 z-[60]" role="dialog" aria-modal="true" aria-label="Player">
+    <div class="player-shell">
+      <div class="player-top">
+        <h2 id="player-title"></h2>
+        <button id="player-close" type="button" class="icon-btn" aria-label="Close">&#10005;</button>
+      </div>
+
+      <div id="player-stage" class="player-stage">
+        <video id="video-player" controls playsinline crossorigin="anonymous"></video>
+        <iframe id="embed-player" class="hidden" title="Player"
+          allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="origin"></iframe>
+        <div id="player-loading" class="player-loading hidden"><span class="spinner"></span><p id="player-loading-text"></p></div>
+      </div>
+
+      <p class="player-hint" data-i18n="hint"></p>
+
+      <div class="player-bar">
+        <div class="ctl ctl-wide"><span data-i18n="server"></span>
+          <div id="server-buttons" class="srv-group" role="group"></div>
+          <select id="server-select" class="sr-only" tabindex="-1" aria-hidden="true"></select>
+        </div>
+
+        <div class="ctl-wide player-actions">
+          <button id="btn-switch-server" type="button" class="btn-ghost" data-i18n="switchServer"></button>
+          <button id="btn-reload" type="button" class="btn-ghost" data-i18n="reloadPlayer"></button>
+          <a id="embed-open" class="btn-ghost hidden" target="_blank" rel="noopener noreferrer" data-i18n="openExternal"></a>
+          <button id="btn-next-episode" type="button" class="btn-ghost"><span data-i18n="next"></span></button>
+        </div>
+        <label class="ctl"><span data-i18n="audio"></span>
+          <select id="audio-select" class="field">
+            <option value="sub" data-i18n="sub"></option>
+            <option value="dub" data-i18n="dub"></option>
+          </select>
+        </label>
+        <label class="ctl"><span data-i18n="quality"></span>
+          <select id="quality-select" class="field">
+            <option value="1080">1080p</option>
+            <option value="720">720p</option>
+            <option value="480">480p</option>
+          </select>
+        </label>
+        <label class="ctl"><span data-i18n="subtitles"></span>
+          <select id="subtitle-select" class="field"><option value="off">-</option></select>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CONFIGURAÇÕES -->
+  <div id="settings-modal" class="modal hidden fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <div class="min-h-full flex items-start justify-center sm:p-8">
+      <div class="modal-panel settings">
+        <div class="settings-head">
+          <h2 id="settings-title" data-i18n="settings"></h2>
+          <button id="settings-close" type="button" class="icon-btn" aria-label="Close">&#10005;</button>
+        </div>
+
+        <section class="set-row">
+          <h3 data-i18n="theme"></h3>
+          <div class="set-chips">
+            <button type="button" class="genre-chip" data-theme-set="dark" data-i18n="themeDark"></button>
+            <button type="button" class="genre-chip" data-theme-set="oled" data-i18n="themeOled"></button>
+          </div>
+        </section>
+
+        <section class="set-row">
+          <h3 data-i18n="defaultServer"></h3>
+          <select id="set-server" class="field"></select>
+        </section>
+
+        <section class="set-row">
+          <label class="set-switch">
+            <input type="checkbox" id="set-nsfw">
+            <span class="slider" aria-hidden="true"></span>
+            <span class="set-text"><b data-i18n="nsfwLabel"></b><small data-i18n="nsfwHint"></small></span>
+          </label>
+        </section>
+
+        <section class="set-row">
+          <label class="set-switch">
+            <input type="checkbox" id="set-privacy">
+            <span class="slider" aria-hidden="true"></span>
+            <span class="set-text"><b data-i18n="privacyLabel"></b><small data-i18n="privacyHint"></small></span>
+          </label>
+        </section>
+
+        <section class="set-row">
+          <h3 data-i18n="shortcuts"></h3>
+          <p class="set-note" data-i18n="shortcutsText"></p>
+        </section>
+
+        <div class="set-links">
+          <a class="btn-ghost" data-github href="#" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a class="btn-ghost" href="https://discord.gg/3qeKkseWSs" target="_blank" rel="noopener noreferrer">Discord</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MASCOTE -->
+  <aside id="mascot" class="mascot" aria-label="Yuki Nagato">
+    <div id="mascot-bubble" class="mascot-bubble">
+      <button id="mascot-min" type="button" class="mascot-x" aria-label="Minimize">&#8722;</button>
+      <strong id="mascot-name"></strong>
+      <p id="mascot-hi"></p>
+      <p id="mascot-tip"></p>
+      <button id="mascot-random" type="button" class="btn-primary" data-i18n="mascotRandom"></button>
+      <a id="mascot-discord" class="btn-ghost" href="https://discord.gg/3qeKkseWSs" target="_blank" rel="noopener noreferrer" data-i18n="discordJoin"></a>
+      <a class="btn-ghost" data-github href="#" target="_blank" rel="noopener noreferrer">GitHub</a>
+    </div>
+    <button id="mascot-avatar" type="button" class="mascot-avatar" aria-expanded="true"></button>
+  </aside>
+
+  <!-- MODAL: TRAILER -->
+  <div id="trailer-modal" class="modal hidden fixed inset-0 z-[65]" role="dialog" aria-modal="true" aria-label="Trailer">
+    <div class="player-shell">
+      <div class="player-top">
+        <h2 id="trailer-title"></h2>
+        <button id="trailer-close" type="button" class="icon-btn" aria-label="Close">&#10005;</button>
+      </div>
+      <div class="player-stage">
+        <iframe id="trailer-frame" title="Trailer" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="origin"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <!-- TELA DE MANUTENÇÃO AUTOMÁTICA -->
+  <div id="maintenance" class="maintenance hidden fixed inset-0 z-[80]" role="alertdialog" aria-live="assertive" aria-labelledby="maint-title">
+    <div class="maint-card">
+      <div class="maint-logo">
+        <img src="logo.jpg" alt="Anime Loft" class="w-14 h-14 rounded-2xl object-cover border border-white/15" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'">
+        <span class="logo-fallback big" style="display:none" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>
+      </div>
+      <h2 id="maint-title" data-i18n="maintTitle"></h2>
+      <p id="maint-text"></p>
+      <div class="maint-actions">
+        <button id="maint-retry" type="button" class="btn-primary" data-i18n="retry"></button>
+        <a id="maint-discord" class="btn-ghost" href="https://discord.gg/3qeKkseWSs" target="_blank" rel="noopener noreferrer" data-i18n="discordJoin"></a>
+        <a class="btn-ghost" data-github href="#" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] shadow-xl" role="status"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17"></script>
+  <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
