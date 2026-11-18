@@ -44,5 +44,14 @@ self.addEventListener('fetch', (event) => {
         .catch(() => cached);
       return cached || network;
     })
+    const CACHE_NAME = 'animeloft-v7';
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (e) => {
+  e.waitUntil(caches.keys().then((keys) => Promise.all(keys.map((k) => k !== CACHE_NAME && caches.delete(k)))));
+  self.clients.claim();
+});
+self.addEventListener('fetch', (e) => {
+  e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+});
   );
 });
