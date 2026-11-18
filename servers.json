@@ -82,5 +82,43 @@
       "enabled": false,
       "auto": false
     }
+    {
+  "maintenance": false,
+  "maintenanceMessage": "Estamos atualizando nossos servidores e aplicando melhorias no Anime Loft. Voltamos em instantes!",
+  "servers": [
+    {
+      "id": "vidsrc_me",
+      "label": "Servidor 1 (Vidsrc.me)",
+      "type": "embed",
+      "template": "https://vidsrc.me/embed/anime?anilist={id}&episode={ep}",
+      "enabled": true,
+      "auto": true
+    },
+    {
+      "id": "vidsrc_net",
+      "label": "Servidor 2 (Vidsrc.net)",
+      "type": "embed",
+      "template": "https://vidsrc.net/embed/anime?anilist={id}&episode={ep}",
+      "enabled": true,
+      "auto": true
+    },
+    {
+      "id": "vidlink",
+      "label": "Servidor 3 (VidLink Pro)",
+      "type": "embed",
+      "template": "https://vidlink.pro/anime/{id}/{ep}/sub",
+      "enabled": true,
+      "auto": true
+    },
+    {
+      "id": "multiembed",
+      "label": "Servidor 4 (MultiEmbed)",
+      "type": "embed",
+      "template": "https://multiembed.mov/directstream.php?video_id={id}&anilist=1&s=1&e={ep}",
+      "enabled": true,
+      "auto": true
+    }
+  ]
+}
   ]
 }
