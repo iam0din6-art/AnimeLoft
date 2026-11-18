@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-device="pc">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -64,7 +64,7 @@
     </nav>
   </header>
 
-  <main class="pt-28 lg:pt-16">
+  <main id="app-main" class="pt-28 lg:pt-16">
     <!-- HOME -->
     <div id="home-view">
       <section id="featured-banner" aria-label="Featured"></section>
@@ -282,7 +282,7 @@
   </div>
 
   <!-- MODAL: CONFIGURAÇÕES -->
-  <div id="settings-modal" class="modal hidden fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+  <div id="settings-modal" class="modal hidden fixed inset-0 z-[75] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="settings-title">
     <div class="min-h-full flex items-start justify-center sm:p-8">
       <div class="modal-panel settings">
         <div class="settings-head">
@@ -299,8 +299,18 @@
         </section>
 
         <section class="set-row">
-          <h3 data-i18n="defaultServer"></h3>
-          <select id="set-server" class="field"></select>
+          <h3 data-i18n="deviceLabel"></h3>
+          <div class="set-chips">
+            <button type="button" class="genre-chip" data-device-set="pc" data-i18n="devPC"></button>
+            <button type="button" class="genre-chip" data-device-set="tv" data-i18n="devTV"></button>
+            <button type="button" class="genre-chip" data-device-set="mobile" data-i18n="devMobile"></button>
+          </div>
+        </section>
+
+        <section class="set-row">
+          <h3 data-i18n="providers"></h3>
+          <p class="set-note" data-i18n="providersHint"></p>
+          <div id="set-providers" class="prov-list"></div>
         </section>
 
         <section class="set-row">
@@ -356,6 +366,36 @@
       <div class="player-stage">
         <iframe id="trailer-frame" title="Trailer" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="origin"></iframe>
       </div>
+    </div>
+  </div>
+
+  <!-- ONBOARDING: SELEÇÃO DE DISPOSITIVO -->
+  <div id="onboarding" class="onboarding hidden fixed inset-0 z-[90]" role="dialog" aria-modal="true" aria-labelledby="ob-title">
+    <div class="ob-card">
+      <div class="maint-logo">
+        <img src="logo.jpg" alt="Anime Loft" class="w-14 h-14 rounded-2xl object-cover border border-white/15" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'">
+        <span class="logo-fallback big" style="display:none" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>
+      </div>
+      <h2 id="ob-title" data-i18n="deviceTitle"></h2>
+      <p class="ob-sub" data-i18n="deviceSub"></p>
+      <div class="ob-options" role="group" aria-labelledby="ob-title">
+        <button type="button" class="ob-option" data-device="pc">
+          <span class="ob-emoji" aria-hidden="true">&#128421;&#65039;</span><b data-i18n="devPC"></b><small data-i18n="devPCHint"></small><i class="ob-rec" data-i18n="devRec"></i>
+        </button>
+        <button type="button" class="ob-option" data-device="tv">
+          <span class="ob-emoji" aria-hidden="true">&#128250;</span><b data-i18n="devTV"></b><small data-i18n="devTVHint"></small><i class="ob-rec" data-i18n="devRec"></i>
+        </button>
+        <button type="button" class="ob-option" data-device="mobile">
+          <span class="ob-emoji" aria-hidden="true">&#128241;</span><b data-i18n="devMobile"></b><small data-i18n="devMobileHint"></small><i class="ob-rec" data-i18n="devRec"></i>
+        </button>
+      </div>
+      <div class="ob-langs" role="group" aria-label="Language">
+        <button type="button" class="genre-chip" data-ob-lang="pt">Português</button>
+        <button type="button" class="genre-chip" data-ob-lang="en">English</button>
+        <button type="button" class="genre-chip" data-ob-lang="es">Español</button>
+        <button type="button" class="genre-chip" data-ob-lang="bn">বাংলা</button>
+      </div>
+      <p class="ob-foot" data-i18n="deviceHint"></p>
     </div>
   </div>
 
