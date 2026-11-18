@@ -69,7 +69,14 @@ function lsSet(key, value) {
 }
 function lsDel(key) { try { localStorage.removeItem(key); } catch (e) {} }
 function lsJSON(key, fallback) {
-  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; }
+  try {
+    const v = localStorage.getItem(key);
+    if (!v) return fallback;
+    const p = JSON.parse(v);
+    // dado corrompido ou de outro formato: usa o padrão
+    if (p === null || typeof p !== typeof fallback || Array.isArray(p) !== Array.isArray(fallback)) return fallback;
+    return p;
+  } catch (e) { return fallback; }
 }
 function lsSetJSON(key, value) { lsSet(key, JSON.stringify(value)); }
 
@@ -134,10 +141,10 @@ function applyI18n(root = document) {
   qsa('[data-i18n-aria]', root).forEach((el) => { el.setAttribute('aria-label', t(el.dataset.i18nAria)); });
 }
 
-function setLang(code, { rerender = true } = {}) {
+function setLang(code, { rerender = true, persist = true } = {}) {
   const lang = I18N.languages.find((l) => l.code === code) || I18N.languages[0];
   state.lang = lang.code;
-  lsSet(K.lang, lang.code);
+  if (persist) lsSet(K.lang, lang.code);
   document.documentElement.lang = lang.code;
   document.documentElement.dir = lang.dir || 'ltr';
   loadScriptFont(lang.code);
@@ -390,6 +397,7 @@ function route() {
 }
 
 function showView(view) {
+  if (state.view !== view) window.scrollTo(0, 0);
   state.view = view;
   qsa('[data-view-panel]').forEach((p) => { p.hidden = p.dataset.viewPanel !== view; });
   qsa('[data-view]').forEach((a) => {
@@ -404,7 +412,7 @@ function showView(view) {
    Home
    --------------------------------------------------------------------- */
 const HOME_QUERY = `query($season: MediaSeason, $year: Int, $nSeason: MediaSeason, $nYear: Int, $adult: Boolean) {
-  trending: Page(perPage: 20) { media(type: ANIME, sort: TRENDING_DESC, isAdult: $adult) { ${MEDIA_FIELDS} } }
+  trending: Page(perPage: 20) { media(type: ANIME, sort: TRENDING_DESC, isAdult: $adult) { ${MEDIA_FIELDS} description } }
   season: Page(perPage: 20) { media(type: ANIME, season: $season, seasonYear: $year, sort: POPULARITY_DESC, isAdult: $adult) { ${MEDIA_FIELDS} } }
   airing: Page(perPage: 20) { media(type: ANIME, status: RELEASING, sort: [TRENDING_DESC, POPULARITY_DESC], isAdult: $adult) { ${MEDIA_FIELDS} } }
   top: Page(perPage: 20) { media(type: ANIME, sort: SCORE_DESC, isAdult: $adult) { ${MEDIA_FIELDS} } }
@@ -711,194 +719,167 @@ function browseVars(page) {
 
 async function loadBrowse(reset) {
   const b = state.browse;
-  if (reset) { b.page = 1; $('browse-grid').innerHTML = skeletonCards(18); }
-  const seq = ++b.seq;
+  if (reset) { b.page = 1; b.seq++; }
+  const seq = b.seq;
+  const grid = $('browse-grid');
+  const more = $('browse-more');
+  if (reset) grid.innerHTML = skeletonCards(18);
   b.loading = true;
-  $('browse-more').hidden = true;
-  qsa('#genre-chips .chip').forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.genre === $('f-genre').value)));
+  more.disabled = true;
+
   try {
-    const data = await gql(BROWSE_QUERY, browseVars(b.page));
-    if (seq !== b.seq) return;
+    const vars = browseVars(b.page);
+    const data = await gql(BROWSE_QUERY, vars);
+    if (seq !== b.seq) { b.loading = false; return; }
+    const pageInfo = data.Page.pageInfo;
     const list = remember(data.Page.media);
-    const html = list.map((m) => cardHTML(m)).join('');
-    if (reset) $('browse-grid').innerHTML = html || emptyHTML('ph-funnel-x', t('noResults'));
-    else $('browse-grid').insertAdjacentHTML('beforeend', html);
-    b.hasNext = data.Page.pageInfo.hasNextPage;
-    $('browse-more').hidden = !b.hasNext;
-    const total = data.Page.pageInfo.total;
-    $('browse-count').textContent = total ? t('titles', { n: total.toLocaleString(state.lang) }) : '';
+    b.hasNext = pageInfo.hasNextPage;
+    $('browse-count').textContent = t('titles', { n: (pageInfo.total || 0).toLocaleString(state.lang) });
+
+    if (reset) {
+      grid.innerHTML = list.length ? list.map((m) => cardHTML(m)).join('') : emptyHTML('ph-magnifying-glass', t('noResults'));
+    } else if (list.length) {
+      grid.insertAdjacentHTML('beforeend', list.map((m) => cardHTML(m)).join(''));
+    }
+    more.hidden = !b.hasNext;
   } catch (e) {
-    if (seq === b.seq && reset) $('browse-grid').innerHTML = errorHTML(() => loadBrowse(true));
-    else if (seq === b.seq) toast(t('loadErr'), { type: 'error' });
+    if (reset && seq === b.seq) grid.innerHTML = errorHTML(() => loadBrowse(true));
+    else { if (!reset) b.page = Math.max(1, b.page - 1); toast(t('loadErr'), { type: 'error' }); }
   } finally {
-    if (seq === b.seq) b.loading = false;
+    b.loading = false;
+    more.disabled = false;
   }
 }
-
-/* ---------------------------------------------------------------------
-   My list
-   --------------------------------------------------------------------- */
-function renderList() {
-  const cont = continueList();
-  $('list-continue').innerHTML = cont.length
-    ? cont.map((c) => cwCardHTML(c, { wide: true })).join('')
-    : emptyHTML('ph-play-circle', t('emptyContinue'), `<a class="btn btn-primary btn-sm" href="#/browse"><i class="ph ph-compass"></i>${esc(t('browse'))}</a>`);
-  $('btn-clear-history').hidden = !cont.length;
-
-  const favs = getFavs();
-  remember(favs.map((f) => Object.assign({}, f)));
-  $('list-favs').innerHTML = favs.length ? favs.map((m) => cardHTML(m)).join('') : emptyHTML('ph-heart', t('emptyFavs'));
-
-  const alBox = $('list-anilist');
-  alBox.hidden = !state.viewer;
-  $('list-sync').textContent = state.viewer ? t('alSignedIn', { n: state.viewer.name }) : '';
-  if (state.viewer) loadAniListList();
-}
-
-const AL_FILTERS = ['CURRENT', 'PLANNING', 'COMPLETED', 'PAUSED'];
-async function loadAniListList() {
-  $('al-filter').innerHTML = AL_FILTERS.map((s) => `<button type="button" data-al-filter="${s}" class="${state.alFilter === s ? 'on' : ''}" role="tab" aria-selected="${state.alFilter === s}">${esc(t('al_' + s))}</button>`).join('');
-  $('list-al').innerHTML = skeletonCards(6);
-  try {
-    const d = await gql(`query($u: Int, $s: MediaListStatus) { MediaListCollection(userId: $u, type: ANIME, status: $s, sort: UPDATED_TIME_DESC) { lists { entries { progress media { ${MEDIA_FIELDS} } } } } }`,
-      { u: state.viewer.id, s: state.alFilter }, { auth: true, cache: false });
-    const entries = (d.MediaListCollection.lists || []).flatMap((l) => l.entries);
-    remember(entries.map((e) => e.media));
-    $('list-al').innerHTML = entries.length
-      ? entries.map((e) => cardHTML(e.media, { progress: e.media.episodes ? e.progress / e.media.episodes : null })).join('')
-      : emptyHTML('ph-tray', t('noResults'));
-  } catch (e) {
-    $('list-al').innerHTML = errorHTML(loadAniListList);
-  }
-}
-
-/* ---------------------------------------------------------------------
-   Detail modal (z-50)
-   --------------------------------------------------------------------- */
-const DETAIL_QUERY = `query($id: Int) {
-  Media(id: $id, type: ANIME) {
-    ${MEDIA_FIELDS}
-    description(asHtml: false) source favourites synonyms
-    studios(isMain: true) { nodes { name } }
-    trailer { id site }
-    relations { edges { relationType node { ${MEDIA_FIELDS} } } }
-    recommendations(perPage: 12, sort: RATING_DESC) { nodes { mediaRecommendation { ${MEDIA_FIELDS} } } }
-  }
-}`;
-const DETAIL_LIST_QUERY = `query($id: Int) { Media(id: $id) { mediaListEntry { id status progress } isFavourite } }`;
 
 async function getMedia(id) {
-  const cached = state.media.get(id);
-  if (cached && cached._full) return cached;
-  const d = await gql(DETAIL_QUERY, { id });
-  const m = Object.assign(d.Media, { _full: true });
-  state.media.set(id, Object.assign(state.media.get(id) || {}, m));
+  const hit = state.media.get(id);
+  if (hit && hit._full) return hit;
+  const data = await gql(`query($id: Int) { Media(id: $id) { ${MEDIA_FIELDS} description siteUrl trailer { id site } relations { edges { relationType node { ${MEDIA_FIELDS} } } } characters(perPage: 10, sort: [ROLE, FAVOURITES_DESC]) { nodes { name { userPreferred } image { large } } } } }`, { id });
+  if (!data || !data.Media) throw new Error('not found');
+  data.Media._full = true;
+  remember([data.Media]);
   return state.media.get(id);
 }
 
+/* ---------------------------------------------------------------------
+   Layers: detail z-50 · player z-60 · trailer z-65 · settings z-75 ·
+   maintenance z-80 · onboarding z-90 (z-index lives in style.css)
+   --------------------------------------------------------------------- */
+const LAYER_Z = { detail: 50, player: 60, trailer: 65, settings: 75, shortcuts: 75, maintenance: 80, onboarding: 90 };
+const STICKY_LAYERS = ['maintenance', 'onboarding']; // Esc and the scrim never dismiss these
+
+function isOpen(id) { return state.stack.includes(id); }
+
+function topLayer() {
+  const order = state.stack.map((id, i) => ({ id, i }));
+  order.sort((a, b) => (LAYER_Z[a.id] - LAYER_Z[b.id]) || (a.i - b.i));
+  return order.length ? order[order.length - 1].id : null;
+}
+
+function syncLayerChrome() {
+  const any = state.stack.length > 0;
+  document.body.classList.toggle('locked', any);
+  document.body.classList.toggle('layer-open', any); // hides the mascot while a window is open
+}
+
+function openLayer(id, focusSel) {
+  const el = $(id);
+  if (!el || isOpen(id)) return;
+  state.lastFocus.push(document.activeElement);
+  el.hidden = false;
+  state.stack.push(id);
+  syncLayerChrome();
+  setTimeout(() => {
+    const target = (focusSel && el.querySelector(focusSel)) || el.querySelector('.btn-primary, .device-card, select, button:not([data-close]), a[href]');
+    if (target) target.focus({ preventScroll: true });
+  }, 40);
+}
+
+function closeLayer(id) {
+  const el = $(id);
+  if (!el || !isOpen(id)) return;
+  el.hidden = true;
+  state.stack = state.stack.filter((x) => x !== id);
+  if (id === 'player') stopPlayer();
+  if (id === 'trailer') $('trailer-frame').src = 'about:blank';
+  if (id === 'detail') state.detail = null;
+  syncLayerChrome();
+  const prev = state.lastFocus.pop();
+  if (prev && prev !== document.body && document.contains(prev) && !prev.closest('[hidden]')) prev.focus({ preventScroll: true });
+}
+
+function closeTopLayer() {
+  const top = topLayer();
+  if (top && !STICKY_LAYERS.includes(top)) { closeLayer(top); return true; }
+  return false;
+}
+
+/* ---------------------------------------------------------------------
+   Detail modal
+   --------------------------------------------------------------------- */
+const AL_STATUSES = ['CURRENT', 'PLANNING', 'COMPLETED', 'PAUSED', 'DROPPED', 'REPEATING'];
+
 async function openDetail(id) {
-  id = Number(id);
-  const quick = state.media.get(id);
-  openLayer('detail');
-  $('detail').querySelector('.sheet').scrollTop = 0;
-  state.epPage = -1;
-  if (quick) renderDetail(quick, true);
-  else renderDetailSkeleton();
+  if (!state.detail || state.detail.id !== id) state.epPage = 0;
+  const cached = state.media.get(id);
+  if (cached) { state.detail = cached; renderDetail(cached); openLayer('detail'); }
   try {
-    const m = await getMedia(id);
-    if (!isOpen('detail')) return;
-    state.detail = m;
-    renderDetail(m);
-    if (state.token) {
-      gql(DETAIL_LIST_QUERY, { id }, { auth: true, cache: false }).then((d) => {
-        if (state.detail && state.detail.id === id) { state.detail.mediaListEntry = d.Media.mediaListEntry; paintAlStatus(); }
-      }).catch(() => {});
-    }
+    const full = await getMedia(id);
+    if (!cached) { state.detail = full; renderDetail(full); openLayer('detail'); }
+    else if (state.detail && state.detail.id === id) { state.detail = full; renderDetail(full); }
   } catch (e) {
-    if (!quick) { closeLayer('detail'); }
-    toast(t('loadErr'), { type: 'error' });
+    if (!cached) toast(t('loadErr'), { type: 'error' });
   }
 }
 
-function renderDetailSkeleton() {
-  $('d-banner').style.backgroundImage = '';
-  $('d-cover').removeAttribute('src');
-  $('d-title').textContent = '';
-  $('d-native').textContent = '';
-  $('d-meta').innerHTML = '<span class="skeleton skel-line" style="width:240px"></span>';
-  $('d-desc').innerHTML = '<span class="skeleton skel-line" style="display:block;margin-bottom:8px"></span><span class="skeleton skel-line short" style="display:block"></span>';
-  $('d-genres').innerHTML = '';
-  $('d-badges').innerHTML = '';
-  $('d-episodes').innerHTML = '';
-  $('review-list').innerHTML = '';
-}
+function bgUrl(u) { return u ? `url("${String(u).replace(/"/g, '%22')}")` : ''; }
 
-function renderDetail(m, partial = false) {
-  state.detail = m;
-  $('d-banner').style.backgroundImage = m.bannerImage ? `url("${m.bannerImage}")` : (coverOf(m) ? `url("${coverOf(m)}")` : '');
-  $('d-cover').src = coverOf(m);
-  $('d-cover').alt = titleOf(m);
-  $('d-title').textContent = titleOf(m);
-  const tt = m.title || {};
-  $('d-native').textContent = [tt.native, tt.romaji !== titleOf(m) ? tt.romaji : ''].filter(Boolean).join(' · ');
+function renderDetail(m) {
+  const title = titleOf(m);
+  const sheet = $('detail');
+  if (state.detailId !== m.id) { state.detailId = m.id; sheet.scrollTop = 0; const s = sheet.querySelector('.sheet'); if (s) s.scrollTop = 0; }
+
+  $('d-banner').style.backgroundImage = bgUrl(m.bannerImage || coverOf(m));
+  const cover = $('d-cover');
+  cover.src = coverOf(m);
+  cover.alt = title;
 
   const badges = [];
-  if (m.status) badges.push(`<span class="badge ${m.status === 'RELEASING' ? 'badge-air' : ''}">${esc(t('st_' + m.status))}</span>`);
-  if (m.isAdult) badges.push('<span class="badge badge-adult">18+</span>');
+  if (m.averageScore) badges.push(`<span class="badge badge-score"><i class="ph-fill ph-star"></i>${(m.averageScore / 10).toFixed(1)}</span>`);
+  if (m.status) badges.push(`<span class="badge${m.status === 'RELEASING' ? ' badge-air' : ''}">${esc(t('st_' + m.status))}</span>`);
   if (m.format) badges.push(`<span class="badge">${esc(fmtLabel(m.format))}</span>`);
+  if (m.isAdult) badges.push('<span class="badge badge-adult">18+</span>');
   $('d-badges').innerHTML = badges.join('');
 
+  $('d-title').textContent = title;
+  const native = (m.title && m.title.native) || '';
+  $('d-native').textContent = native && native !== title ? native : '';
+
+  const year = m.seasonYear || (m.startDate && m.startDate.year);
   const meta = [];
-  if (m.averageScore) meta.push(`<span><i class="ph-fill ph-star"></i>${(m.averageScore / 10).toFixed(1)}</span>`);
-  if (m.season || m.seasonYear) meta.push(`<span><i class="ph ph-calendar-blank"></i>${esc([m.season ? t(m.season) : '', m.seasonYear].filter(Boolean).join(' '))}</span>`);
-  if (m.episodes) meta.push(`<span><i class="ph ph-list-numbers"></i>${esc(t('eps', { n: m.episodes }))}</span>`);
-  if (m.duration) meta.push(`<span><i class="ph ph-timer"></i>${esc(t('min', { n: m.duration }))}</span>`);
-  const studio = m.studios && m.studios.nodes && m.studios.nodes[0];
-  if (studio) meta.push(`<span><i class="ph ph-buildings"></i>${esc(studio.name)}</span>`);
-  if (m.popularity) meta.push(`<span><i class="ph ph-users"></i>${m.popularity.toLocaleString(state.lang)}</span>`);
+  if (year) meta.push(`<span><i class="ph ph-calendar-blank"></i>${m.season ? esc(t(m.season)) + ' ' : ''}${year}</span>`);
+  if (m.episodes) meta.push(`<span><i class="ph ph-film-slate"></i>${esc(t('eps', { n: m.episodes }))}</span>`);
+  if (m.duration) meta.push(`<span><i class="ph ph-clock"></i>${esc(t('min', { n: m.duration }))}</span>`);
+  if (m.popularity) meta.push(`<span><i class="ph ph-users"></i>${Number(m.popularity).toLocaleString(state.lang)}</span>`);
   $('d-meta').innerHTML = meta.join('');
 
-  const desc = stripHtml(m.description || '');
-  const descEl = $('d-desc');
-  descEl.textContent = desc || (partial ? '' : '—');
-  descEl.classList.toggle('collapsed', desc.length > 360);
-  descEl.title = desc.length > 360 ? 'Click to expand' : '';
+  const cont = getContinue()[m.id];
+  const n = cont ? cont.ep : 1;
+  $('d-play').querySelector('span').textContent = cont ? t('resumeEp', { n }) : t('playEp', { n });
+  $('d-play').disabled = releasedEpisodes(m) < 1;
 
-  $('d-genres').innerHTML = (m.genres || []).map((g) => `<button type="button" class="chip" data-goto-genre="${esc(g)}">${esc(g)}</button>`).join('');
+  paintFav(m);
+  $('d-al-wrap').hidden = !state.token;
+  paintAlSelect(m.id);
 
-  // Actions
-  paintPlayButton();
-  const hasTrailer = m.trailer && m.trailer.site === 'youtube' && m.trailer.id;
-  $('d-trailer').hidden = !hasTrailer && !partial;
-  $('d-trailer').disabled = !hasTrailer;
-  paintFav();
-  paintAlStatus();
-
-  renderEpisodes();
+  $('d-desc').textContent = stripHtml(m.description || '');
+  $('d-genres').innerHTML = (m.genres || []).map((g) => `<button type="button" class="chip" data-genre="${esc(g)}">${esc(g)}</button>`).join('');
+  renderEpisodes(m);
   renderRelated(m);
-  renderReviews(m.id);
+  renderReviews(m);
 }
 
-function paintPlayButton() {
-  const m = state.detail;
-  if (!m) return;
-  const c = getContinue()[m.id];
-  const released = releasedEpisodes(m);
-  const btn = $('d-play');
-  if (!released) {
-    btn.disabled = true;
-    btn.querySelector('span').textContent = t('st_NOT_YET_RELEASED');
-    return;
-  }
-  btn.disabled = false;
-  const ep = c ? Math.min(c.ep, released) : 1;
-  btn.querySelector('span').textContent = c ? t('resumeEp', { n: ep }) : t('playEp', { n: ep });
-  btn.dataset.ep = ep;
-}
-
-function paintFav() {
-  const m = state.detail;
-  if (!m) return;
+function paintFav(m) {
   const on = isFav(m.id);
   const b = $('d-fav');
   b.setAttribute('aria-pressed', String(on));
@@ -906,947 +887,982 @@ function paintFav() {
   b.querySelector('span').textContent = t(on ? 'favRemove' : 'favAdd');
 }
 
-function paintAlStatus() {
-  const wrap = $('d-al-wrap');
-  wrap.hidden = !state.token;
-  if (!state.token || !state.detail) return;
-  const sel = $('d-al-status');
-  const cur = (state.detail.mediaListEntry && state.detail.mediaListEntry.status) || 'NONE';
-  sel.innerHTML = ['NONE', 'CURRENT', 'PLANNING', 'COMPLETED', 'PAUSED', 'DROPPED', 'REPEATING']
-    .map((s) => `<option value="${s}" ${s === 'NONE' ? 'disabled' : ''}>${esc(t('al_' + s))}</option>`).join('');
-  sel.value = cur;
-}
-
-async function saveAniList(mediaId, fields) {
-  if (!state.token) return null;
-  const d = await gql(`mutation($mediaId: Int, $status: MediaListStatus, $progress: Int) {
-    SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress) { id status progress }
-  }`, Object.assign({ mediaId }, fields), { auth: true, cache: false });
-  return d.SaveMediaListEntry;
-}
-
-function renderEpisodes() {
-  const m = state.detail;
+function renderEpisodes(m) {
+  const PAGE = 100;
   const total = totalEpisodes(m);
   const released = releasedEpisodes(m);
-  const grid = $('d-episodes');
+  const pages = Math.max(1, Math.ceil(total / PAGE));
   const range = $('d-ep-range');
-  const watched = new Set(getWatched(m.id));
-  const c = getContinue()[m.id];
-  const nae = m.nextAiringEpisode;
-  $('d-ep-note').textContent = nae ? t('nextAiring', { n: nae.episode, t: fmtCountdown(nae.timeUntilAiring) }) : '';
-  if (!total) { grid.innerHTML = `<p class="body-6 muted">${esc(t('noEpisodes'))}</p>`; range.hidden = true; return; }
-
-  const PAGE = 100;
-  const pages = Math.ceil(total / PAGE);
-  if (state.epPage < 0) state.epPage = c ? Math.floor((c.ep - 1) / PAGE) : 0;
-  state.epPage = Math.min(state.epPage, pages - 1);
   range.hidden = pages < 2;
   if (pages > 1) {
+    if (state.epPage >= pages) state.epPage = 0;
     range.innerHTML = Array.from({ length: pages }, (_, i) => `<option value="${i}">${i * PAGE + 1}–${Math.min(total, (i + 1) * PAGE)}</option>`).join('');
     range.value = String(state.epPage);
-  }
-  const start = state.epPage * PAGE + 1, end = Math.min(total, start + PAGE - 1);
+  } else state.epPage = 0;
+
+  const watched = new Set(getWatched(m.id));
+  const cont = getContinue()[m.id];
+  const from = state.epPage * PAGE + 1;
+  const to = Math.min(total, from + PAGE - 1);
   let html = '';
-  for (let ep = start; ep <= end; ep++) {
+  for (let n = from; n <= to; n++) {
     const cls = ['ep'];
-    if (watched.has(ep)) cls.push('watched');
-    if (c && c.ep === ep) cls.push('current');
-    if (ep > released) cls.push('soon');
-    const label = `${t('episode')} ${ep}${watched.has(ep) ? ' · ' + t('watched') : ''}`;
-    html += `<button type="button" class="${cls.join(' ')}" data-ep="${ep}" aria-label="${esc(label)}" ${ep > released ? 'disabled' : ''}>${ep}</button>`;
+    if (watched.has(n)) cls.push('watched');
+    if (cont && cont.ep === n) cls.push('current');
+    if (n > released) cls.push('soon');
+    html += `<button type="button" class="${cls.join(' ')}" data-ep="${n}" aria-label="${esc(t('playEp', { n }))}">${n}</button>`;
   }
-  grid.innerHTML = html;
+  $('d-episodes').innerHTML = html;
+
+  let note = '';
+  if (m.nextAiringEpisode && m.nextAiringEpisode.episode) {
+    note = t('nextAiring', { n: m.nextAiringEpisode.episode, t: fmtCountdown(m.nextAiringEpisode.timeUntilAiring || 0) });
+  } else if (released < 1) note = t('noEpisodes');
+  $('d-ep-note').textContent = note;
 }
 
 function renderRelated(m) {
-  const rel = ((m.relations && m.relations.edges) || [])
-    .filter((e) => e.node && e.node.type === 'ANIME' && ['PREQUEL', 'SEQUEL', 'SIDE_STORY', 'SPIN_OFF', 'ALTERNATIVE', 'PARENT'].includes(e.relationType))
-    .map((e) => e.node);
-  const recs = ((m.recommendations && m.recommendations.nodes) || []).map((n) => n.mediaRecommendation).filter(Boolean);
-  const seen = new Set([m.id]);
-  const list = [...rel, ...recs].filter((x) => (state.nsfw || !x.isAdult) && !seen.has(x.id) && seen.add(x.id)).slice(0, 18);
-  remember(list);
-  $('d-rel-wrap').hidden = !list.length;
-  $('d-related').innerHTML = list.map((x) => cardHTML(x)).join('');
+  const edges = (m.relations && m.relations.edges) || [];
+  const nodes = remember(edges.map((e) => e.node).filter((n) => n && n.type === 'ANIME'));
+  $('d-rel-wrap').hidden = !nodes.length;
+  $('d-related').innerHTML = nodes.map((n) => cardHTML(n)).join('');
 }
 
-/* ----- Reviews (local, per anime) ----- */
-let pendingStars = 0;
-function getReviews(id) { return lsJSON(K.reviews + id, []); }
-function setReviews(id, list) { lsSetJSON(K.reviews + id, list); }
+/* AniList entry (status) for the open title */
+async function paintAlSelect(id) {
+  const sel = $('d-al-status');
+  sel.innerHTML = ['NONE', ...AL_STATUSES].map((s) => `<option value="${s}">${esc(t('al_' + s))}</option>`).join('');
+  if (!state.token) return;
+  const apply = () => { if (state.detail && state.detail.id === id) sel.value = (state.alEntries.get(id) || { status: 'NONE' }).status; };
+  if (state.alEntries.has(id)) { apply(); return; }
+  sel.disabled = true;
+  try {
+    const d = await gql('query($id: Int) { Media(id: $id) { mediaListEntry { id status progress } } }', { id }, { auth: true, cache: false });
+    state.alEntries.set(id, d.Media.mediaListEntry || null);
+    apply();
+  } catch (e) { /* keep the select on "not on my list" */ } finally { sel.disabled = false; }
+}
 
-function renderReviews(id) {
-  pendingStars = 0;
-  $('review-text').value = '';
-  $('review-err').hidden = true;
-  const box = $('detail').querySelector('.stars-input');
-  box.innerHTML = [1, 2, 3, 4, 5].map((n) => `<button type="button" class="star-btn" role="radio" aria-checked="false" data-star="${n}" aria-label="${n} / 5"><i class="ph-fill ph-star"></i></button>`).join('');
-  const list = getReviews(id);
-  if (!list.length) {
-    $('review-summary').innerHTML = '';
-    $('review-list').innerHTML = `<li class="caption-2 muted">${esc(t('noReviews'))}</li>`;
-    return;
+async function onAlStatus(e) {
+  const m = state.detail;
+  if (!m || !state.token) return;
+  const status = e.target.value;
+  const entry = state.alEntries.get(m.id);
+  try {
+    if (status === 'NONE') {
+      if (entry && entry.id) await gql('mutation($id: Int) { DeleteMediaListEntry(id: $id) { deleted } }', { id: entry.id }, { auth: true, cache: false });
+      state.alEntries.set(m.id, null);
+    } else {
+      const d = await gql('mutation($m: Int, $s: MediaListStatus) { SaveMediaListEntry(mediaId: $m, status: $s) { id status progress } }', { m: m.id, s: status }, { auth: true, cache: false });
+      state.alEntries.set(m.id, d.SaveMediaListEntry);
+    }
+    toast(t('synced'), { type: 'ok' });
+  } catch (err) {
+    toast(t('syncFail'), { type: 'error' });
+    e.target.value = (entry || { status: 'NONE' }).status;
   }
-  const avg = list.reduce((s, r) => s + r.stars, 0) / list.length;
-  $('review-summary').innerHTML = `<strong>${avg.toFixed(1)}</strong><span class="stars" style="color:var(--sun)">${'★'.repeat(Math.round(avg))}${'☆'.repeat(5 - Math.round(avg))}</span><span>${esc(t('avgOf', { n: list.length }))}</span>`;
-  $('review-list').innerHTML = list.slice().sort((a, b) => b.at - a.at).map((r) => `<li class="review">
-    <div class="review-top">
-      <span class="title-4">${esc(r.name || t('guest'))} <span class="stars" aria-label="${r.stars} / 5">${'★'.repeat(r.stars)}${'☆'.repeat(5 - r.stars)}</span></span>
-      <span class="caption-5 muted">${new Date(r.at).toLocaleDateString(state.lang)} <button type="button" class="review-del" data-del-review="${r.id}">${esc(t('del'))}</button></span>
-    </div>
-    ${r.text ? `<p>${esc(r.text)}</p>` : ''}
-  </li>`).join('');
 }
 
-function paintStars(n) {
-  qsa('#detail .star-btn').forEach((b) => {
-    const on = Number(b.dataset.star) <= n;
+/* When an episode starts, push the progress to AniList if the title is on the user's list */
+async function syncProgress(anime, ep) {
+  if (!state.token) return;
+  try {
+    const d = await gql('query($id: Int) { Media(id: $id) { mediaListEntry { id status progress } } }', { id: anime.id }, { auth: true, cache: false });
+    const entry = d.Media.mediaListEntry;
+    state.alEntries.set(anime.id, entry || null);
+    if (!entry || (entry.progress || 0) >= ep) return;
+    const status = entry.status === 'PLANNING' || entry.status === 'PAUSED' || entry.status === 'DROPPED' ? 'CURRENT' : entry.status;
+    const r = await gql('mutation($m: Int, $p: Int, $s: MediaListStatus) { SaveMediaListEntry(mediaId: $m, progress: $p, status: $s) { id status progress } }', { m: anime.id, p: ep, s: status }, { auth: true, cache: false });
+    state.alEntries.set(anime.id, r.SaveMediaListEntry);
+  } catch (e) { /* silent: the player must never depend on AniList */ }
+}
+
+/* ---------------------------------------------------------------------
+   Trailer
+   --------------------------------------------------------------------- */
+function openTrailer() {
+  const tr = state.detail && state.detail.trailer;
+  if (!tr || !/^[\w-]+$/.test(tr.id || '')) { toast(t('noTrailer')); return; }
+  $('trailer-frame').src = tr.site === 'dailymotion'
+    ? `https://www.dailymotion.com/embed/video/${tr.id}?autoplay=1`
+    : `https://www.youtube-nocookie.com/embed/${tr.id}?autoplay=1&rel=0`;
+  openLayer('trailer');
+}
+
+/* ---------------------------------------------------------------------
+   Reviews (localStorage, per anime id)
+   --------------------------------------------------------------------- */
+function getReviews(id) { return lsJSON(K.reviews + id, []); }
+function starsText(n) { const r = Math.round(n); return '★'.repeat(r) + '☆'.repeat(5 - r); }
+
+function paintStarInput() {
+  const box = qsa('.stars-input')[0];
+  if (!box) return;
+  if (!box.children.length) {
+    box.innerHTML = [1, 2, 3, 4, 5].map((n) => `<button type="button" class="star-btn" role="radio" aria-checked="false" data-star="${n}" aria-label="${n}">★</button>`).join('');
+  }
+  qsa('.star-btn', box).forEach((b) => {
+    const on = Number(b.dataset.star) <= state.pendingStars;
     b.classList.toggle('on', on);
-    b.setAttribute('aria-checked', String(Number(b.dataset.star) === n));
+    b.setAttribute('aria-checked', String(Number(b.dataset.star) === state.pendingStars));
   });
+}
+
+function renderReviews(m) {
+  if (state.reviewFor !== m.id) { // new title: clear the form (re-renders keep what the user typed)
+    state.reviewFor = m.id;
+    state.pendingStars = 0;
+    $('review-text').value = '';
+    $('review-err').hidden = true;
+  }
+  paintStarInput();
+  const list = getReviews(m.id);
+  const avg = list.length ? list.reduce((s, r) => s + (Number(r.stars) || 0), 0) / list.length : 0;
+  $('review-summary').innerHTML = list.length
+    ? `<strong>${avg.toFixed(1)}</strong><span class="stars" style="color:var(--sun)">${starsText(avg)}</span><span>${esc(t('avgOf', { n: list.length }))}</span>`
+    : `<span>${esc(t('noReviews'))}</span>`;
+  $('review-list').innerHTML = list.map((r, i) => {
+    const date = new Date(r.at || Date.now()).toLocaleDateString(state.lang);
+    return `<li class="review">
+      <div class="review-top"><strong>${esc(r.name || t('guest'))}</strong><span class="stars">${starsText(r.stars)}</span></div>
+      ${r.text ? `<p>${esc(r.text)}</p>` : ''}
+      <div class="review-top"><span class="caption-5 muted">${esc(date)}</span><button type="button" class="review-del" data-del-review="${i}">${esc(t('del'))}</button></div>
+    </li>`;
+  }).join('');
 }
 
 function submitReview(e) {
   e.preventDefault();
   const m = state.detail;
   if (!m) return;
-  if (!pendingStars) { $('review-err').textContent = t('needStars'); $('review-err').hidden = false; return; }
+  const err = $('review-err');
+  if (!state.pendingStars) { err.textContent = t('needStars'); err.hidden = false; return; }
+  err.hidden = true;
   const list = getReviews(m.id);
-  list.push({ id: Date.now().toString(36), stars: pendingStars, text: $('review-text').value.trim().slice(0, 600), at: Date.now(), name: state.viewer ? state.viewer.name : t('guest') });
-  setReviews(m.id, list);
-  renderReviews(m.id);
+  list.unshift({
+    name: state.viewer ? state.viewer.name : null, // null = guest, translated when shown
+    avatar: state.viewer ? state.viewer.avatar : '',
+    stars: state.pendingStars,
+    text: $('review-text').value.trim().slice(0, 600),
+    at: Date.now()
+  });
+  lsSetJSON(K.reviews + m.id, list.slice(0, 100));
+  state.pendingStars = 0;
+  $('review-text').value = '';
+  renderReviews(m);
   toast(t('reviewSaved'), { type: 'ok' });
 }
 
 /* ---------------------------------------------------------------------
-   Trailer (z-65)
+   Player (embed iframe, no sandbox)
    --------------------------------------------------------------------- */
-function openTrailer() {
-  const m = state.detail;
-  if (!m || !m.trailer || m.trailer.site !== 'youtube') { toast(t('noTrailer')); return; }
-  $('trailer-frame').src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(m.trailer.id)}?autoplay=1&rel=0&modestbranding=1`;
-  openLayer('trailer');
+function orderedServers() {
+  const prefs = state.prefs;
+  const list = state.config.servers.filter((s) => s.type === 'embed' && s.enabled !== false && prefs.enabled[s.id] !== false);
+  const i = prefs.default ? list.findIndex((s) => s.id === prefs.default) : -1;
+  if (i > 0) list.unshift(list.splice(i, 1)[0]);
+  return list;
 }
-function closeTrailerFrame() { $('trailer-frame').src = 'about:blank'; }
 
-/* ---------------------------------------------------------------------
-   Stream providers
-   --------------------------------------------------------------------- */
-async function loadServersConfig() {
+/* Fills {anilistId} {malId} {ep} {audio} {dub}; null when a needed value is missing */
+function embedUrl(server, anime, ep, audio) {
+  const ctx = { anilistId: anime.id, malId: anime.idMal, ep, audio, dub: audio === 'dub' ? 1 : 0 };
+  let missing = false;
+  const url = String(server.url || '').replace(/\{(\w+)\}/g, (_, k) => {
+    const v = ctx[k];
+    if (v == null || v === '') { missing = true; return ''; }
+    return encodeURIComponent(v);
+  });
+  return missing || !/^https?:\/\//.test(url) ? null : url;
+}
+
+function playableEpisode(m, wanted) {
+  const released = releasedEpisodes(m);
+  return Math.min(Math.max(1, wanted || 1), Math.max(1, released));
+}
+
+async function playAnime(id) {
   try {
-    const res = await fetch(SERVERS_URL, { cache: 'no-store' });
-    if (!res.ok) throw new Error(res.status);
-    const cfg = await res.json();
-    if (!cfg || !Array.isArray(cfg.servers)) throw new Error('bad config');
-    state.config = cfg;
-    lsSetJSON(K.serversCache, cfg);
-  } catch (e) {
-    state.config = lsJSON(K.serversCache, DEFAULT_SERVERS);
-  }
-  if (state.config.maintenance) showMaintenance();
+    const m = await getMedia(id);
+    if (releasedEpisodes(m) < 1) { toast(t('noEpisodes')); openDetail(id); return; }
+    const c = getContinue()[id];
+    openPlayer(m, playableEpisode(m, c ? c.ep : 1));
+  } catch (e) { toast(t('loadErr'), { type: 'error' }); }
 }
 
-function allEmbedServers() {
-  return (state.config.servers || []).filter((s) => s.type === 'embed' && s.enabled !== false && s.url);
+function startEpisode(n) {
+  if (state.detail) openPlayer(state.detail, n);
 }
-function activeServers() {
-  const list = allEmbedServers().filter((s) => state.prefs.enabled[s.id] !== false);
-  const def = state.prefs.default;
-  return list.sort((a, b) => (a.id === def ? -1 : b.id === def ? 1 : 0));
-}
-function savePrefs() { lsSetJSON(K.servers, state.prefs); }
-
-function buildEmbedUrl(server, { anime, ep, audio }) {
-  if (/\{malId\}/.test(server.url) && !anime.idMal) return null;
-  return server.url
-    .replace(/\{anilistId\}/g, anime.id)
-    .replace(/\{malId\}/g, anime.idMal || '')
-    .replace(/\{ep\}/g, ep)
-    .replace(/\{audio\}/g, audio)
-    .replace(/\{dub\}/g, audio === 'dub' ? '1' : '0');
-}
-
-/* ---------------------------------------------------------------------
-   Player (z-60) — iframe with NO sandbox attribute
-   --------------------------------------------------------------------- */
-let embedTimer = null, hintTimer = null, lastTick = 0;
 
 function openPlayer(anime, ep) {
-  const servers = activeServers();
-  if (!servers.length) { toast(t('noServer'), { type: 'error', action: { label: t('settings'), run: openSettings } }); return; }
-  const released = releasedEpisodes(anime) || 1;
-  ep = Math.max(1, Math.min(Number(ep) || 1, released));
-  const keepServer = state.player && servers.find((s) => s.id === state.player.server) ? state.player.server : servers[0].id;
-  state.player = { anime, ep, server: keepServer, audio: lsGet(K.audio, 'sub') };
-  if (!isOpen('player')) openLayer('player');
+  const list = orderedServers();
+  if (!list.length) {
+    toast(t('noServer'), { type: 'error', action: { label: t('settings'), run: () => openLayer('settings') } });
+    return;
+  }
+  remember([anime]);
+  const audio = lsGet(K.audio, 'sub') === 'dub' ? 'dub' : 'sub';
+  state.player = { anime, ep, server: list[0].id, audio, url: '' };
+  saveContinue(anime, ep);
+  markWatched(anime.id, ep);
+  syncProgress(anime, ep);
+  openLayer('player', '#p-next');
   paintPlayerChrome();
-  loadEpisode();
+  loadStream();
+}
+
+/* Loads the current server into the iframe, skipping servers with no source for this title */
+function loadStream() {
+  const p = state.player;
+  if (!p) return;
+  clearTimeout(state.hintTimer);
+  $('stage-hint').hidden = true;
+  const overlay = $('stage-loading');
+  overlay.classList.remove('gone');
+  const frame = $('embed-player');
+  const list = orderedServers();
+  let start = list.findIndex((s) => s.id === p.server);
+  if (start < 0) start = 0;
+  let warned = false;
+  for (let i = 0; i < list.length; i++) {
+    const s = list[(start + i) % list.length];
+    const url = embedUrl(s, p.anime, p.ep, p.audio);
+    if (!url) {
+      if (!warned) { toast(t('serverSkip', { s: s.label })); warned = true; }
+      continue;
+    }
+    p.server = s.id;
+    p.url = url;
+    frame.src = url;
+    $('p-direct').href = url;
+    paintPlayerChrome();
+    state.hintTimer = setTimeout(() => { // still black? offer the way out
+      overlay.classList.add('gone');
+      $('stage-hint').hidden = false;
+    }, EMBED_TIMEOUT_MS);
+    return;
+  }
+  overlay.classList.add('gone');
+  frame.src = 'about:blank';
+  $('p-direct').removeAttribute('href');
+  toast(t('noServer'), { type: 'error' });
+  paintPlayerChrome();
+}
+
+function stopPlayer() {
+  clearTimeout(state.hintTimer);
+  $('embed-player').src = 'about:blank';
+  state.player = null;
+  $('stage-hint').hidden = true;
+  $('stage-loading').classList.remove('gone');
+  if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+  renderContinueRail();
+  if (state.view === 'list') renderList();
+  if (state.detail) renderDetail(state.detail); // watched marks + resume label
 }
 
 function paintPlayerChrome() {
   const p = state.player;
   if (!p) return;
-  const released = releasedEpisodes(p.anime) || 1;
+  const total = totalEpisodes(p.anime);
+  const released = releasedEpisodes(p.anime);
   $('p-title').textContent = titleOf(p.anime);
-  $('p-sub').textContent = `${t('episode')} ${p.ep}${released > 1 ? ` / ${released}` : ''}`;
+  $('p-sub').textContent = `${t('episode')} ${p.ep}${total ? ' / ' + total : ''}`;
+
   const sel = $('p-episode');
-  let opts = '';
-  for (let i = 1; i <= released; i++) opts += `<option value="${i}">${esc(t('ep'))} ${i}</option>`;
-  sel.innerHTML = opts;
-  sel.value = String(p.ep);
-  $('p-prev').disabled = p.ep <= 1;
-  $('p-next').disabled = p.ep >= released;
-  qsa('#p-audio button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.audio === p.audio)));
-  $('p-servers').innerHTML = activeServers().map((s) => {
-    const ok = buildEmbedUrl(s, { anime: p.anime, ep: p.ep, audio: p.audio });
-    return `<button type="button" class="srv" role="radio" data-server="${esc(s.id)}" aria-checked="${s.id === p.server}" ${ok ? '' : 'disabled title="No ID for this provider"'}>${esc(s.label)}</button>`;
-  }).join('');
-  applyI18n($('player'));
-}
-
-function loadEpisode({ reload = false } = {}) {
-  const p = state.player;
-  const servers = activeServers();
-  let server = servers.find((s) => s.id === p.server) || servers[0];
-  let url = buildEmbedUrl(server, { anime: p.anime, ep: p.ep, audio: p.audio });
-  if (!url) {
-    const alt = servers.find((s) => buildEmbedUrl(s, { anime: p.anime, ep: p.ep, audio: p.audio }));
-    if (!alt) { toast(t('noServer'), { type: 'error' }); return; }
-    toast(t('serverSkip', { s: server.label }));
-    server = alt;
-    p.server = alt.id;
-    url = buildEmbedUrl(alt, { anime: p.anime, ep: p.ep, audio: p.audio });
-    paintPlayerChrome();
+  const max = Math.max(released, p.ep);
+  const sig = `${p.anime.id}:${max}`;
+  if (sel.dataset.sig !== sig) {
+    sel.innerHTML = Array.from({ length: max }, (_, i) => `<option value="${i + 1}">${t('ep')} ${i + 1}</option>`).join('');
+    sel.dataset.sig = sig;
   }
-  const frame = $('embed-player');
-  $('p-direct').href = url;
-  $('stage-loading').classList.remove('gone');
-  $('stage-loading').hidden = false;
-  $('stage-hint').hidden = true;
-  clearTimeout(embedTimer); clearTimeout(hintTimer);
-  embedTimer = setTimeout(() => { hideStageLoading(); showHint(); }, EMBED_TIMEOUT_MS);
-  frame.onload = () => {
-    if (frame.src === 'about:blank') return;
-    clearTimeout(embedTimer);
-    hideStageLoading();
-    hintTimer = setTimeout(showHint, 2500);
-  };
-  if (reload) { frame.src = 'about:blank'; setTimeout(() => { frame.src = url; }, 60); }
-  else frame.src = url;
+  sel.value = String(p.ep);
 
-  saveContinue(p.anime, p.ep);
-  markWatched(p.anime.id, p.ep);
-  syncProgress(p.anime, p.ep);
+  qsa('#p-audio [data-audio]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.audio === p.audio)));
+
+  const servers = orderedServers();
+  const box = $('p-servers');
+  const ssig = servers.map((s) => s.id).join('|');
+  if (box.dataset.sig !== ssig) {
+    box.innerHTML = servers.map((s) => `<button type="button" class="srv" role="radio" data-srv="${esc(s.id)}">${esc(s.label)}</button>`).join('');
+    box.dataset.sig = ssig;
+  }
+  qsa('.srv', box).forEach((b) => b.setAttribute('aria-checked', String(b.dataset.srv === p.server)));
+  $('p-prev').disabled = p.ep <= 1;
 }
 
-function hideStageLoading() {
-  const ov = $('stage-loading');
-  ov.classList.add('gone');
-  setTimeout(() => { if (ov.classList.contains('gone')) ov.hidden = true; }, 500);
-}
-function showHint() {
-  const h = $('stage-hint');
-  h.hidden = false;
-  clearTimeout(hintTimer);
-  hintTimer = setTimeout(() => { h.hidden = true; }, 7000);
-}
-
-const syncProgress = debounce(async (anime, ep) => {
-  if (!state.token) return;
-  try {
-    const entry = anime.mediaListEntry;
-    if (entry && entry.progress >= ep) return;
-    const released = totalEpisodes(anime);
-    const status = anime.episodes && ep >= anime.episodes ? 'COMPLETED' : 'CURRENT';
-    const saved = await saveAniList(anime.id, { progress: ep, status: entry && entry.status === 'REPEATING' ? 'REPEATING' : status });
-    if (saved) { anime.mediaListEntry = saved; toast(t('synced'), { type: 'ok', ms: 2200 }); }
-    void released;
-  } catch (e) { /* silent: local history already saved */ }
-}, 1500);
-
-function changeEpisode(delta) {
+function changeEpisode(n) {
   const p = state.player;
-  if (!p) return;
-  const released = releasedEpisodes(p.anime) || 1;
-  const ep = p.ep + delta;
-  if (ep < 1) return;
-  if (ep > released) { toast(t('lastEp')); return; }
-  p.ep = ep;
+  if (!p || n < 1) return;
+  if (n > releasedEpisodes(p.anime)) { toast(t('lastEp')); paintPlayerChrome(); return; }
+  p.ep = n;
+  saveContinue(p.anime, n);
+  markWatched(p.anime.id, n);
+  syncProgress(p.anime, n);
+  loadStream();
   paintPlayerChrome();
-  loadEpisode();
-}
-
-function closePlayerFrame() {
-  clearTimeout(embedTimer); clearTimeout(hintTimer);
-  $('embed-player').src = 'about:blank';
-  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-  renderContinueRail();
-  if (state.view === 'list') renderList();
-  if (isOpen('detail') && state.detail) { renderEpisodes(); paintPlayButton(); }
 }
 
 function toggleFullscreen() {
-  if (!isOpen('player')) return;
+  if (document.fullscreenElement) { document.exitFullscreen().catch(() => {}); return; }
   const el = $('player-shell');
-  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-  else if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
-  else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
-}
-
-/* Progress messages that some providers post from inside the iframe */
-function initEmbedProgress() {
-  window.addEventListener('message', (ev) => {
-    const frame = $('embed-player');
-    if (!state.player || ev.source !== frame.contentWindow) return;
-    let d = ev.data;
-    if (typeof d === 'string') { try { d = JSON.parse(d); } catch (e) { return; } }
-    const info = (d && (d.data || d.payload)) || d || {};
-    const time = Number(info.currentTime != null ? info.currentTime : info.time);
-    const duration = Number(info.duration) || 0;
-    if (!Number.isFinite(time) || time <= 0 || Date.now() - lastTick < 5000) return;
-    lastTick = Date.now();
-    saveContinue(state.player.anime, state.player.ep, time, duration);
-  });
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (req) { const r = req.call(el); if (r && r.catch) r.catch(() => {}); }
 }
 
 /* ---------------------------------------------------------------------
-   Layers: stack, focus trap, Esc, Android back button
+   My list
    --------------------------------------------------------------------- */
-const LAYER_ORDER = ['detail', 'player', 'trailer', 'shortcuts', 'settings', 'maintenance', 'onboarding'];
-const UNCLOSABLE = ['maintenance', 'onboarding'];
-
-function isOpen(id) { return state.stack.includes(id); }
-
-function openLayer(id) {
-  const el = $(id);
-  if (isOpen(id)) return;
-  state.lastFocus.push(document.activeElement);
-  state.stack.push(id);
-  el.hidden = false;
-  document.body.classList.add('locked', 'layer-open');
-  if (!UNCLOSABLE.includes(id)) {
-    try { history.pushState({ loftLayer: id }, '', location.href); } catch (e) {}
+const AL_FILTERS = ['CURRENT', 'PLANNING', 'COMPLETED', 'PAUSED', 'DROPPED'];
+const AL_LIST_QUERY = `query($uid: Int, $st: MediaListStatus) {
+  MediaListCollection(userId: $uid, type: ANIME, status: $st, sort: UPDATED_TIME_DESC) {
+    lists { entries { progress media { ${MEDIA_FIELDS} } } }
   }
-  requestAnimationFrame(() => {
-    const target = el.querySelector('[autofocus]') || el.querySelector('.device-card, .sheet-x, [data-close].icon-btn, button:not([disabled]), a[href], select, input');
-    if (target) target.focus({ preventScroll: true });
-  });
+}`;
+
+function renderList() {
+  const cont = continueList();
+  $('list-continue').innerHTML = cont.length
+    ? cont.map((c) => cwCardHTML(c, { wide: true })).join('')
+    : emptyHTML('ph-play-circle', t('emptyContinue'));
+  const favs = getFavs();
+  $('list-favs').innerHTML = favs.length
+    ? favs.map((m) => cardHTML(m)).join('')
+    : emptyHTML('ph-heart', t('emptyFavs'));
+  remember(favs.map((f) => Object.assign({ coverImage: f.coverImage }, f)));
+  renderAniListBlock();
 }
 
-function closeLayer(id, fromPop = false) {
-  if (!isOpen(id)) return;
-  if (!fromPop && history.state && history.state.loftLayer === id) {
-    history.back(); // popstate does the actual closing
-    return;
-  }
-  const el = $(id);
-  el.hidden = true;
-  state.stack = state.stack.filter((x) => x !== id);
-  if (id === 'player') closePlayerFrame();
-  if (id === 'trailer') closeTrailerFrame();
-  if (id === 'detail') state.detail = null;
-  if (!state.stack.length) document.body.classList.remove('locked', 'layer-open');
-  const prev = state.lastFocus.pop();
-  if (prev && document.contains(prev) && prev.focus) prev.focus({ preventScroll: true });
-}
-
-function closeTop() {
-  const top = state.stack[state.stack.length - 1];
-  if (top && !UNCLOSABLE.includes(top)) closeLayer(top);
-}
-
-window.addEventListener('popstate', () => {
-  const top = state.stack[state.stack.length - 1];
-  if (top && !UNCLOSABLE.includes(top)) closeLayer(top, true);
-});
-
-function trapFocus(e) {
-  const top = state.stack[state.stack.length - 1];
-  if (!top || e.key !== 'Tab') return;
-  const root = $(top);
-  const f = focusables(root);
-  if (!f.length) return;
-  const first = f[0], last = f[f.length - 1];
-  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-  else if (!root.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
-}
-
-function focusables(root) {
-  return qsa('a[href], button:not([disabled]), select:not([disabled]), input:not([disabled]), textarea:not([disabled]), iframe, [tabindex]:not([tabindex="-1"])', root)
-    .filter((el) => el.offsetParent !== null || el.tagName === 'IFRAME')
-    .filter((el) => el.getAttribute('tabindex') !== '-1');
-}
-
-/* ---------------------------------------------------------------------
-   Keyboard: Esc, F, /, N/P, spatial arrows
-   --------------------------------------------------------------------- */
-function isTyping(el) {
-  return el && (el.tagName === 'INPUT' && !['checkbox', 'radio', 'button'].includes(el.type) || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
-}
-
-function onKeyDown(e) {
-  if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
-  const active = document.activeElement;
-
-  if (e.key === 'Escape') {
-    if ($('navbar').classList.contains('search-open') && !state.stack.length) { closeMobileSearch(); return; }
-    if (!$('account-menu').hidden) { $('account-menu').hidden = true; return; }
-    if (isTyping(active) && active.id === 'search-input') { active.blur(); return; }
-    closeTop();
-    return;
-  }
-  if (e.key === 'Tab') { trapFocus(e); return; }
-  if (isTyping(active)) return;
-
-  const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-  if (key === 'f' && isOpen('player')) { e.preventDefault(); toggleFullscreen(); return; }
-  if (key === 'n' && isOpen('player') && state.stack[state.stack.length - 1] === 'player') { changeEpisode(1); return; }
-  if (key === 'p' && isOpen('player') && state.stack[state.stack.length - 1] === 'player') { changeEpisode(-1); return; }
-  if (key === '/' && !state.stack.length) {
-    e.preventDefault();
-    if (window.innerWidth < 768) openMobileSearch(); else $('search-input').focus();
-    return;
-  }
-  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) spatialNav(e);
-}
-
-function spatialNav(e) {
-  const active = document.activeElement;
-  const tv = state.device === 'tv';
-  const onItem = active && active !== document.body && active.matches('.card, .btn, .icon-btn, .ep, .srv, .chip, .nav-tab, .tab-item, .device-card, .hero-dot, .star-btn, .cw-thumb, .seg button, .theme-cards button, a, button');
-  if (!tv && !onItem) return; // keep native scrolling on desktop/mobile when nothing is focused
-  const top = state.stack[state.stack.length - 1];
-  const root = top ? $(top) : document;
-  let pool = focusables(root).filter((el) => el.tagName !== 'IFRAME');
-  if (!top) pool = pool.filter((el) => !el.closest('.layer'));
-  if (!pool.length) return;
-  e.preventDefault();
-  if (!onItem || !pool.includes(active)) {
-    const first = pool.find((el) => el.matches('.card, .btn-primary')) || pool[0];
-    focusEl(first);
-    return;
-  }
-  const a = active.getBoundingClientRect();
-  const ax = a.left + a.width / 2, ay = a.top + a.height / 2;
-  let dir = e.key;
-  if (document.dir === 'rtl' && (dir === 'ArrowLeft' || dir === 'ArrowRight')) dir = dir === 'ArrowLeft' ? 'ArrowRight' : 'ArrowLeft';
-  let best = null, bestScore = Infinity;
-  for (const el of pool) {
-    if (el === active) continue;
-    const r = el.getBoundingClientRect();
-    if (!r.width && !r.height) continue;
-    const bx = r.left + r.width / 2, by = r.top + r.height / 2;
-    const dx = bx - ax, dy = by - ay;
-    let primary, secondary;
-    if (dir === 'ArrowRight') { if (r.left < a.right - 4) continue; primary = dx; secondary = Math.abs(dy); }
-    else if (dir === 'ArrowLeft') { if (r.right > a.left + 4) continue; primary = -dx; secondary = Math.abs(dy); }
-    else if (dir === 'ArrowDown') { if (r.top < a.bottom - 4) continue; primary = dy; secondary = Math.abs(dx); }
-    else { if (r.bottom > a.top + 4) continue; primary = -dy; secondary = Math.abs(dx); }
-    const score = primary + secondary * 2.2;
-    if (score < bestScore) { bestScore = score; best = el; }
-  }
-  if (best) focusEl(best);
-  else if (e.key === 'ArrowUp' && !top) window.scrollBy({ top: -240, behavior: 'smooth' });
-}
-
-function focusEl(el) {
-  el.focus({ preventScroll: true });
-  el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: reduceMotion() ? 'auto' : 'smooth' });
-  const rail = el.closest('.rail');
-  if (rail) {
-    const r = el.getBoundingClientRect();
-    if (r.top < (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--nav-h')) || 72) + 16) {
-      window.scrollBy({ top: r.top - 120, behavior: reduceMotion() ? 'auto' : 'smooth' });
-    }
-  }
-}
-
-/* ---------------------------------------------------------------------
-   Settings (z-75)
-   --------------------------------------------------------------------- */
-function openSettings() { paintSettings(); openLayer('settings'); }
-
-function paintSettings() {
-  qsa('#s-device button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.device === state.device)));
-  qsa('#s-theme button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.themeOpt === state.theme)));
-  $('s-nsfw').checked = state.nsfw;
-  $('s-privacy').checked = state.privacy;
-
-  const servers = allEmbedServers();
-  const enabled = servers.filter((s) => state.prefs.enabled[s.id] !== false);
-  const def = state.prefs.default && enabled.some((s) => s.id === state.prefs.default) ? state.prefs.default : (enabled[0] && enabled[0].id) || '';
-  $('s-default-server').innerHTML = enabled.map((s) => `<option value="${esc(s.id)}">${esc(s.label)}</option>`).join('');
-  $('s-default-server').value = def;
-  $('s-servers').innerHTML = servers.map((s) => `<li class="toggle-row">
-    <div><span class="body-5">${esc(s.label)}</span><p class="caption-5 muted">${esc(new URL(s.url.replace(/\{[^}]+\}/g, '0')).hostname)}</p></div>
-    <input type="checkbox" class="switch" role="switch" data-toggle-server="${esc(s.id)}" ${state.prefs.enabled[s.id] !== false ? 'checked' : ''} aria-label="${esc(s.label)}">
-  </li>`).join('');
-
-  $('s-client-id').value = lsGet(K.clientId, CONFIG.anilistClientId || '');
-  $('s-redirect').textContent = location.origin + location.pathname;
-  $('s-al-hint').textContent = state.viewer ? t('alSignedIn', { n: state.viewer.name }) : t('alHint');
-  $('s-al-login').hidden = !!state.token;
-  $('s-al-logout').hidden = !state.token;
-  $('s-version').textContent = t('version', { v: APP_VERSION });
-}
-
-function setDevice(mode, { announce = true } = {}) {
-  state.device = mode;
-  lsSet(K.device, mode);
-  document.documentElement.dataset.device = mode;
-  paintSettings();
-  measureChrome();
-  if (mode === 'tv' && lsGet(K.mascot) === null) setMascotMin(true, false);
-  if (announce) toast(t('saved'), { type: 'ok', ms: 1800 });
-}
-
-function setTheme(theme) {
-  state.theme = theme;
-  lsSet(K.theme, theme);
-  document.documentElement.dataset.theme = theme;
-  const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.content = theme === 'oled' ? '#000000' : theme === 'sky' ? '#EAF5FC' : '#061521';
-  paintSettings();
-}
-
-function resetCatalog() {
-  homeData = null;
-  state.media.clear();
-  $('browse-grid').innerHTML = '';
-  buildFilterSelects();
-  route();
-}
-
-/* ---------------------------------------------------------------------
-   AniList auth (implicit grant; works on localhost or Vercel)
-   --------------------------------------------------------------------- */
-function clientId() { return (lsGet(K.clientId) || CONFIG.anilistClientId || '').trim(); }
-
-function login() {
-  const id = clientId();
-  if (!id) { toast(t('alNeedId'), { type: 'error' }); openSettings(); setTimeout(() => $('s-client-id').focus(), 200); return; }
-  location.href = `https://anilist.co/api/v2/oauth/authorize?client_id=${encodeURIComponent(id)}&response_type=token`;
-}
-
-function handleAuthRedirect() {
-  const h = location.hash;
-  if (!h.includes('access_token=')) return;
-  const p = new URLSearchParams(h.slice(1));
-  const token = p.get('access_token');
-  const exp = Number(p.get('expires_in')) || 31536000;
-  if (token) { lsSet(K.token, token); lsSet(K.tokenExp, String(Date.now() + exp * 1000)); }
-  history.replaceState(null, '', location.pathname + location.search + '#/home');
-}
-
-function loadToken() {
-  const tok = lsGet(K.token);
-  const exp = Number(lsGet(K.tokenExp)) || 0;
-  if (tok && exp > Date.now()) state.token = tok;
-  else if (tok) { lsDel(K.token); lsDel(K.tokenExp); }
-}
-
-async function loadViewer() {
-  if (!state.token) return;
+async function renderAniListBlock() {
+  const block = $('list-anilist');
+  if (!state.token || !state.viewer) { block.hidden = true; $('list-sync').textContent = ''; return; }
+  block.hidden = false;
+  $('al-filter').innerHTML = AL_FILTERS.map((s) =>
+    `<button type="button" role="tab" data-al="${s}" aria-selected="${s === state.alFilter}" class="${s === state.alFilter ? 'on' : ''}">${esc(t('al_' + s))}</button>`).join('');
+  const grid = $('list-al');
+  const seq = ++state.alSeq;
+  grid.innerHTML = skeletonCards(6);
   try {
-    const d = await gql('{ Viewer { id name siteUrl avatar { medium } } }', {}, { auth: true, cache: false });
-    state.viewer = d.Viewer;
-    renderAuth();
-    if (state.view === 'list') renderList();
-  } catch (e) { /* handled in gql */ }
-}
-
-function logout(silent = false) {
-  lsDel(K.token); lsDel(K.tokenExp);
-  state.token = null;
-  state.viewer = null;
-  $('account-menu').hidden = true;
-  renderAuth();
-  paintSettings();
-  if (state.view === 'list') renderList();
-  if (!silent) toast(t('logout'), { type: 'ok', ms: 1800 });
-}
-
-function renderAuth() {
-  const av = $('account-avatar');
-  if (state.viewer) {
-    av.style.backgroundImage = `url("${state.viewer.avatar.medium}")`;
-    av.innerHTML = '';
-    $('account-label').textContent = state.viewer.name;
-    $('account-name').textContent = state.viewer.name;
-    $('account-profile').href = state.viewer.siteUrl;
-  } else {
-    av.style.backgroundImage = '';
-    av.innerHTML = '<i class="ph ph-user"></i>';
-    $('account-label').textContent = t('login');
+    const d = await gql(AL_LIST_QUERY, { uid: state.viewer.id, st: state.alFilter }, { auth: true, cache: false });
+    if (seq !== state.alSeq) return;
+    const entries = d.MediaListCollection.lists.flatMap((l) => l.entries);
+    remember(entries.map((e) => e.media));
+    grid.innerHTML = entries.length
+      ? entries.map((e) => {
+        const tot = totalEpisodes(e.media);
+        return cardHTML(e.media, { progress: tot ? Math.min(1, (e.progress || 0) / tot) : null });
+      }).join('')
+      : emptyHTML('ph-cloud', `${t('al_' + state.alFilter)} · 0`);
+    $('list-sync').textContent = t('synced');
+  } catch (e) {
+    if (seq === state.alSeq) grid.innerHTML = errorHTML(renderAniListBlock);
   }
 }
 
 /* ---------------------------------------------------------------------
-   Maintenance (z-80) and onboarding (z-90)
+   Browse helpers
    --------------------------------------------------------------------- */
-function showMaintenance() {
-  const msg = state.config.message || {};
-  $('m-msg').textContent = msg[state.lang] || msg.en || t('maintTitle');
-  openLayer('maintenance');
+function syncChips() {
+  const g = $('f-genre').value;
+  qsa('#genre-chips .chip').forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.genre === g)));
 }
 
-function maybeOnboard() {
-  if (state.device) return;
-  openLayer('onboarding');
+function pickGenre(genre) {
+  const sel = $('f-genre');
+  const has = Array.from(sel.options).some((o) => o.value === genre);
+  sel.value = has && sel.value !== genre ? genre : '';
+  syncChips();
+  if (isOpen('detail')) closeLayer('detail');
+  if (state.view !== 'browse') { location.hash = '#/browse'; setTimeout(() => loadBrowse(true), 0); } else loadBrowse(true);
+}
+
+function scrollRail(id, dir) {
+  const rail = $('rail-' + id);
+  if (!rail) return;
+  const rtl = document.documentElement.dir === 'rtl';
+  rail.scrollBy({ left: dir * (rtl ? -1 : 1) * rail.clientWidth * 0.85, behavior: reduceMotion() ? 'auto' : 'smooth' });
 }
 
 /* ---------------------------------------------------------------------
-   Mascot: Yuki Nagato assistant bubble
+   Surprise me + mascot (Yuki Nagato) + tagline
    --------------------------------------------------------------------- */
-let mascotIdx = 0;
-function mascotSay(reset = false) {
-  const lines = ['mascotHi', 'tip1', 'tip2', 'tip3', 'tip4'];
-  if (reset) mascotIdx = 0;
-  $('mascot-say').textContent = t(lines[mascotIdx % lines.length]);
-}
-function setMascotMin(min, save = true) {
-  $('mascot').classList.toggle('min', min);
-  $('mascot-avatar').setAttribute('aria-expanded', String(!min));
-  if (save) lsSet(K.mascot, min ? '1' : '0');
-}
-async function initMascot() {
-  const saved = lsGet(K.mascot);
-  const startMin = saved === null ? (state.device === 'tv' || window.innerWidth < 768) : saved === '1';
-  setMascotMin(startMin, false);
-  mascotSay(true);
-  setInterval(() => { if (!$('mascot').classList.contains('min')) { mascotIdx++; mascotSay(); } }, 14000);
-  try {
-    const d = await gql('query { Character(search: "Yuki Nagato") { name { full } image { medium } } }');
-    const c = d.Character;
-    if (c && c.image && c.image.medium) {
-      const av = $('mascot-avatar');
-      av.style.backgroundImage = `url("${c.image.medium}")`;
-      av.classList.add('has-img');
-      $('mascot-name').textContent = c.name.full;
-    }
-  } catch (e) { /* icon fallback */ }
-}
+const SURPRISE_QUERY = `query($page: Int, $adult: Boolean) {
+  Page(page: $page, perPage: 50) { media(type: ANIME, averageScore_greater: 78, sort: POPULARITY_DESC, isAdult: $adult) { ${MEDIA_FIELDS} } }
+}`;
 
-/* Surprise me: random well-rated show */
 async function surprise() {
   try {
-    const page = 1 + Math.floor(Math.random() * 12);
-    const d = await gql(`query($p: Int, $adult: Boolean) { Page(page: $p, perPage: 50) { media(type: ANIME, sort: POPULARITY_DESC, averageScore_greater: 78, isAdult: $adult) { ${MEDIA_FIELDS} } } }`, { p: page, adult: adultVar() });
+    const d = await gql(SURPRISE_QUERY, { page: 1 + Math.floor(Math.random() * 6), adult: adultVar() });
     const list = remember(d.Page.media);
     if (!list.length) throw new Error('empty');
     openDetail(list[Math.floor(Math.random() * list.length)].id);
   } catch (e) { toast(t('loadErr'), { type: 'error' }); }
 }
 
-/* ---------------------------------------------------------------------
-   Tagline reveal (word by word on scroll, IntersectionObserver)
-   --------------------------------------------------------------------- */
+const MASCOT_LINES = ['mascotHi', 'tip1', 'tip2', 'tip3', 'tip4'];
+let mascotIdx = 0;
+let mascotTimer = null;
+
+function mascotSay(repaint) {
+  if (!repaint) mascotIdx = (mascotIdx + 1) % MASCOT_LINES.length;
+  $('mascot-say').textContent = t(MASCOT_LINES[mascotIdx]);
+}
+
+function paintMascotMin(min) {
+  $('mascot').classList.toggle('min', min);
+  $('mascot-avatar').setAttribute('aria-expanded', String(!min));
+}
+
+function toggleMascot() {
+  const min = !$('mascot').classList.contains('min');
+  paintMascotMin(min);
+  lsSet(K.mascot, min ? '1' : '0');
+}
+
+async function initMascot() {
+  paintMascotMin(lsGet(K.mascot) === '1');
+  mascotIdx = 0;
+  mascotSay(true);
+  clearInterval(mascotTimer);
+  mascotTimer = setInterval(() => { if (!document.hidden && !$('mascot').classList.contains('min')) mascotSay(); }, 25000);
+  try { // portrait comes from AniList; the book icon stays if it fails
+    const d = await gql('query($s: String) { Character(search: $s) { name { userPreferred } image { large } } }', { s: 'Yuki Nagato' });
+    const c = d && d.Character;
+    if (c && c.image && c.image.large) {
+      $('mascot-avatar').style.backgroundImage = bgUrl(c.image.large);
+      $('mascot-avatar').classList.add('has-img');
+    }
+    if (c && c.name && c.name.userPreferred) $('mascot-name').textContent = c.name.userPreferred;
+  } catch (e) { /* optional */ }
+}
+
 let taglineObserver = null;
 function renderTagline() {
-  const el = $('tagline-text');
-  const lines = t('tagline').split('|');
-  let i = 0;
-  el.innerHTML = lines.map((line) => line.split(' ').map((w) => `<span class="w${/loft/i.test(w) ? ' loft' : ''}" data-i="${i++}">${esc(w)}</span>`).join(' ')).join('<br>');
+  const box = $('tagline-text');
+  const lines = String(t('tagline')).split('|');
+  box.innerHTML = lines.map((line) => {
+    const words = /\s/.test(line.trim()) ? line.trim().split(/\s+/) : (line.match(/[A-Za-z0-9’']+|\S/gu) || []);
+    const spaced = /\s/.test(line.trim());
+    return '<span style="display:block">' + words.map((w) =>
+      `<span class="w${/loft/i.test(w) ? ' loft' : ''}">${esc(w)}</span>`).join(spaced ? ' ' : '') + '</span>';
+  }).join('');
+  const all = qsa('.w', box);
   if (taglineObserver) taglineObserver.disconnect();
-  if (reduceMotion() || !('IntersectionObserver' in window)) { qsa('.w', el).forEach((w) => w.classList.add('on')); return; }
+  if (reduceMotion() || !('IntersectionObserver' in window)) { all.forEach((w) => w.classList.add('on')); return; }
   taglineObserver = new IntersectionObserver((entries) => {
-    entries.forEach((en) => {
-      if (en.isIntersecting) { en.target.classList.add('on'); taglineObserver.unobserve(en.target); }
-    });
-  }, { rootMargin: '0px 0px -38% 0px', threshold: 1 });
-  qsa('.w', el).forEach((w) => taglineObserver.observe(w));
+    if (!entries.some((e) => e.isIntersecting)) return;
+    all.forEach((w, i) => setTimeout(() => w.classList.add('on'), i * 110));
+    taglineObserver.disconnect();
+  }, { threshold: 0.4 });
+  taglineObserver.observe(box);
 }
 
 /* ---------------------------------------------------------------------
-   Layout measuring: navbar never overlaps content
+   Device, theme, settings
    --------------------------------------------------------------------- */
-function measureChrome() {
-  const root = document.documentElement.style;
-  const nav = $('navbar').getBoundingClientRect();
-  root.setProperty('--nav-h', Math.ceil(nav.bottom) + 'px');
-  const tab = $('tabbar');
-  const tabH = getComputedStyle(tab).display === 'none' ? 0 : Math.ceil(tab.getBoundingClientRect().height);
-  root.setProperty('--tab-h', tabH + 'px');
+function detectDevice() {
+  const ua = navigator.userAgent || '';
+  if (/SMART-TV|SmartTV|Tizen|Web0S|WebOS|NetCast|HbbTV|PlayStation|Xbox|Nintendo|AFTB|AFTS|AFTM|CrKey|BRAVIA|Roku|VIDAA/i.test(ua)) return 'tv';
+  const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua) || (coarse && Math.min(screen.width, screen.height) < 900)) return 'mobile';
+  return 'pc';
 }
 
-function openMobileSearch() {
-  $('navbar').classList.add('search-open');
-  measureChrome();
-  $('search-input').focus();
+function setDevice(mode, { persist = true } = {}) {
+  if (!['pc', 'tv', 'mobile'].includes(mode)) mode = 'pc';
+  state.device = mode;
+  document.documentElement.dataset.device = mode;
+  if (persist) lsSet(K.device, mode);
+  paintSettings();
 }
-function closeMobileSearch() {
-  $('navbar').classList.remove('search-open');
-  $('search-input').blur();
-  measureChrome();
+
+function pickDevice(mode) {
+  setDevice(mode);
+  closeLayer('onboarding');
+}
+
+function setTheme(name) {
+  if (!['dark', 'oled', 'sky'].includes(name)) name = 'dark';
+  state.theme = name;
+  document.documentElement.dataset.theme = name;
+  lsSet(K.theme, name);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+  if (meta && bg) meta.setAttribute('content', bg);
+  paintSettings();
+}
+
+function paintSettings() {
+  qsa('#s-device button[data-device]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.device === state.device)));
+  qsa('#s-theme [data-theme-opt]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.themeOpt === state.theme)));
+  $('s-lang').value = state.lang;
+  $('s-nsfw').checked = state.nsfw;
+  $('s-privacy').checked = state.privacy;
+
+  const embeds = state.config.servers.filter((s) => s.type === 'embed' && s.enabled !== false);
+  $('s-default-server').innerHTML = embeds.map((s) => `<option value="${esc(s.id)}">${esc(s.label)}</option>`).join('');
+  $('s-default-server').value = state.prefs.default && embeds.some((s) => s.id === state.prefs.default) ? state.prefs.default : (embeds[0] ? embeds[0].id : '');
+  $('s-servers').innerHTML = embeds.map((s) => {
+    let host = '';
+    try { host = new URL(s.url.replace(/\{\w+\}/g, '1')).hostname; } catch (e) { /* bad url in config */ }
+    return `<li class="toggle-row"><div><span class="body-5">${esc(s.label)}</span><p class="caption-5 muted">${esc(host)}</p></div>
+      <input type="checkbox" class="switch" role="switch" data-srv-toggle="${esc(s.id)}" ${state.prefs.enabled[s.id] === false ? '' : 'checked'}></li>`;
+  }).join('');
+
+  $('s-al-hint').textContent = t('alHint');
+  $('s-client-id').value = lsGet(K.clientId) || CONFIG.anilistClientId || '';
+  $('s-redirect').textContent = location.origin + location.pathname;
+  $('s-al-login').hidden = Boolean(state.viewer);
+  $('s-al-logout').hidden = !state.viewer;
+  $('s-version').textContent = t('version', { v: APP_VERSION });
+}
+
+function savePrefs() { lsSetJSON(K.servers, state.prefs); }
+
+function resetCatalog() { // after changing the 18+ filter or clearing the cache
+  pruneQueryCache(true);
+  homeData = null;
+  $('browse-grid').innerHTML = '';
+  buildFilterSelects();
+  route();
+}
+
+function clearHistory() {
+  lsDel(K.cont);
+  lsDel(K.watched);
+  renderContinueRail();
+  if (state.view === 'list') renderList();
+  if (state.detail) renderDetail(state.detail);
+  toast(t('historyCleared'), { type: 'ok' });
 }
 
 /* ---------------------------------------------------------------------
-   Events
+   AniList sign-in (implicit grant) and account menu
+   --------------------------------------------------------------------- */
+function readToken() {
+  const exp = Number(lsGet(K.tokenExp) || 0);
+  const token = lsGet(K.token);
+  if (token && exp > Date.now()) return token;
+  if (token) { lsDel(K.token); lsDel(K.tokenExp); }
+  return null;
+}
+
+/* AniList redirects back with #access_token=…: grab it before the router sees the hash */
+function captureToken() {
+  if (!/access_token=/.test(location.hash)) return false;
+  const p = new URLSearchParams(location.hash.replace(/^#\/?/, ''));
+  const token = p.get('access_token');
+  if (token) {
+    lsSet(K.token, token);
+    lsSet(K.tokenExp, String(Date.now() + (Number(p.get('expires_in')) || 31536000) * 1000));
+  }
+  history.replaceState(null, '', location.pathname + location.search + '#/home');
+  return Boolean(token);
+}
+
+function startLogin() {
+  const id = (lsGet(K.clientId) || CONFIG.anilistClientId || '').trim();
+  if (!/^\d+$/.test(id)) {
+    toast(t('alNeedId'), { type: 'error' });
+    openLayer('settings', '#s-client-id');
+    return;
+  }
+  location.href = `https://anilist.co/api/v2/oauth/authorize?client_id=${encodeURIComponent(id)}&response_type=token`;
+}
+
+async function loadViewer(announce) {
+  if (!state.token) return;
+  try {
+    const d = await gql('{ Viewer { id name siteUrl avatar { medium } } }', {}, { auth: true, cache: false });
+    state.viewer = { id: d.Viewer.id, name: d.Viewer.name, avatar: d.Viewer.avatar && d.Viewer.avatar.medium, url: d.Viewer.siteUrl };
+    renderAuth();
+    paintSettings();
+    if (announce) toast(t('alSignedIn', { n: state.viewer.name }), { type: 'ok' });
+    if (state.view === 'list') renderList();
+  } catch (e) { /* gql already signs out on 401 */ }
+}
+
+function logout(silent) {
+  lsDel(K.token);
+  lsDel(K.tokenExp);
+  state.token = null;
+  state.viewer = null;
+  state.alEntries.clear();
+  closeAccountMenu();
+  renderAuth();
+  paintSettings();
+  if (state.view === 'list') renderList();
+  if (state.detail) renderDetail(state.detail);
+}
+
+function renderAuth() {
+  const v = state.viewer;
+  const avatar = $('account-avatar');
+  avatar.style.backgroundImage = v && v.avatar ? bgUrl(v.avatar) : '';
+  avatar.innerHTML = v && v.avatar ? '' : '<i class="ph ph-user"></i>';
+  $('account-label').textContent = v ? v.name : t('login');
+  $('btn-account').setAttribute('aria-expanded', 'false');
+  if (v) {
+    $('account-name').textContent = v.name;
+    $('account-profile').href = v.url || `https://anilist.co/user/${encodeURIComponent(v.name)}`;
+  } else closeAccountMenu();
+}
+
+function closeAccountMenu() {
+  $('account-menu').hidden = true;
+  $('btn-account').setAttribute('aria-expanded', 'false');
+}
+
+function onAccountClick() {
+  if (!state.viewer) { startLogin(); return; }
+  const open = $('account-menu').hidden;
+  $('account-menu').hidden = !open;
+  $('btn-account').setAttribute('aria-expanded', String(open));
+}
+
+/* ---------------------------------------------------------------------
+   servers.json + maintenance screen
+   --------------------------------------------------------------------- */
+function validateConfig(cfg) {
+  if (!cfg || typeof cfg !== 'object' || !Array.isArray(cfg.servers)) return null;
+  const servers = cfg.servers.filter((s) => s && /^[\w-]+$/.test(s.id || '') && typeof s.label === 'string'
+    && s.type === 'embed' && /^https?:\/\//.test(s.url || ''));
+  if (!servers.length) return null;
+  return { version: cfg.version || 1, maintenance: cfg.maintenance === true, message: cfg.message || null, servers };
+}
+
+function pickMessage(msg) {
+  if (!msg) return '';
+  if (typeof msg === 'string') return msg;
+  return msg[state.lang] || msg.en || Object.values(msg)[0] || '';
+}
+
+function showMaintenance(message) {
+  $('m-msg').textContent = pickMessage(message) || pickMessage(DEFAULT_SERVERS.message);
+  openLayer('maintenance', '#m-retry');
+  clearInterval(state.maintTimer);
+  state.maintTimer = setInterval(loadServersConfig, 60000); // lifts itself when the flag turns off
+}
+
+function hideMaintenance() {
+  clearInterval(state.maintTimer);
+  closeLayer('maintenance');
+}
+
+/* Fresh file wins; otherwise the last good copy; otherwise the built-in list. Maintenance only counts when fresh */
+async function loadServersConfig() {
+  let cfg = null;
+  let fresh = false;
+  try {
+    const r = await fetch(`${SERVERS_URL}?t=${Date.now()}`, { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    cfg = validateConfig(await r.json());
+    if (!cfg) throw new Error('invalid servers.json');
+    fresh = true;
+    lsSetJSON(K.serversCache, cfg);
+  } catch (e) {
+    cfg = validateConfig(lsJSON(K.serversCache, null)) || validateConfig(DEFAULT_SERVERS);
+  }
+  state.config = cfg;
+  if (fresh && cfg.maintenance) showMaintenance(cfg.message);
+  else if (isOpen('maintenance')) { hideMaintenance(); resetCatalog(); }
+  paintSettings();
+}
+
+/* ---------------------------------------------------------------------
+   Keyboard: Esc · F · / · arrows · N / P
+   --------------------------------------------------------------------- */
+function focusablesIn(root) {
+  return qsa('a[href], button:not([disabled]), select:not([disabled]), input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])', root)
+    .filter((el) => el.getClientRects().length && !el.closest('[hidden]') && getComputedStyle(el).visibility !== 'hidden');
+}
+
+function spatialMove(key) {
+  const top = topLayer();
+  const root = top ? $(top) : document.body;
+  const list = focusablesIn(root).filter((el) => top || !el.closest('#mascot, .skip-link'));
+  if (!list.length) return false;
+  const cur = document.activeElement;
+  if (!cur || cur === document.body || !list.includes(cur)) { list[0].focus(); return true; }
+  const r = cur.getBoundingClientRect();
+  const cx = r.left + r.width / 2;
+  const cy = r.top + r.height / 2;
+  const horizontal = key === 'ArrowLeft' || key === 'ArrowRight';
+  let best = null;
+  let bestScore = Infinity;
+  list.forEach((el) => {
+    if (el === cur) return;
+    const b = el.getBoundingClientRect();
+    const dx = b.left + b.width / 2 - cx;
+    const dy = b.top + b.height / 2 - cy;
+    const ok = key === 'ArrowRight' ? dx > 4 : key === 'ArrowLeft' ? dx < -4 : key === 'ArrowDown' ? dy > 4 : dy < -4;
+    if (!ok) return;
+    const score = (horizontal ? Math.abs(dx) : Math.abs(dy)) + (horizontal ? Math.abs(dy) : Math.abs(dx)) * 2.5;
+    if (score < bestScore) { bestScore = score; best = el; }
+  });
+  if (!best) return false;
+  best.focus({ preventScroll: true });
+  best.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: reduceMotion() ? 'auto' : 'smooth' });
+  return true;
+}
+
+function trapTab(e) {
+  const top = topLayer();
+  if (!top) return;
+  const items = focusablesIn($(top));
+  if (!items.length) return;
+  const first = items[0];
+  const last = items[items.length - 1];
+  if (!$(top).contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+  else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+}
+
+function focusSearch() {
+  const nav = $('navbar');
+  if (getComputedStyle($('search-form')).display === 'none') nav.classList.add('search-open');
+  $('search-input').focus();
+  $('search-input').select();
+}
+
+function onKey(e) {
+  if (e.key === 'Escape') {
+    if (!$('account-menu').hidden) { closeAccountMenu(); return; }
+    if (closeTopLayer()) { e.preventDefault(); return; }
+    $('navbar').classList.remove('search-open');
+    return;
+  }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === 'Tab') { trapTab(e); return; }
+
+  const el = document.activeElement || document.body;
+  const tag = el.tagName;
+  const typing = tag === 'TEXTAREA' || (tag === 'INPUT' && !/^(checkbox|radio|button|submit|reset)$/.test(el.type)) || el.isContentEditable;
+  if (typing) return;
+
+  if (e.key === '/') { e.preventDefault(); focusSearch(); return; }
+  if (isOpen('player') && !isOpen('settings') && !isOpen('trailer')) {
+    if (e.key === 'f' || e.key === 'F') { e.preventDefault(); toggleFullscreen(); return; }
+    if (e.key === 'n' || e.key === 'N') { e.preventDefault(); changeEpisode(state.player.ep + 1); return; }
+    if (e.key === 'p' || e.key === 'P') { e.preventDefault(); changeEpisode(state.player.ep - 1); return; }
+  }
+  if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+    if (tag === 'SELECT' && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) return; // native select
+    const interactive = el !== document.body && el.matches && el.matches('a, button, [tabindex], select, input');
+    if (!interactive && state.device !== 'tv') return;
+    if (spatialMove(e.key)) e.preventDefault();
+  }
+}
+
+/* ---------------------------------------------------------------------
+   Delegated clicks
+   --------------------------------------------------------------------- */
+function onClick(e) {
+  const q = (sel) => e.target.closest(sel);
+  let el;
+  if ((el = q('[data-close]'))) { const layer = el.closest('.layer'); if (layer) closeLayer(layer.id); return; }
+  if ((el = q('[data-remove-cw]'))) { removeContinue(el.dataset.removeCw); renderContinueRail(); if (state.view === 'list') renderList(); return; }
+  if ((el = q('[data-resume]'))) { resumeContinue(Number(el.dataset.resume)); return; }
+  if ((el = q('[data-play]'))) { playAnime(Number(el.dataset.play)); return; }
+  if ((el = q('[data-open]'))) { openDetail(Number(el.dataset.open)); return; }
+  if ((el = q('[data-scroll]'))) { scrollRail(el.dataset.scroll, Number(el.dataset.dir)); return; }
+  if ((el = q('[data-dot]'))) { heroGo(Number(el.dataset.dot)); return; }
+  if ((el = q('[data-genre]'))) { pickGenre(el.dataset.genre); return; }
+  if ((el = q('[data-ep]'))) { startEpisode(Number(el.dataset.ep)); return; }
+  if ((el = q('[data-open-settings]'))) { openLayer('settings'); return; }
+  if ((el = q('[data-pick-device]'))) { pickDevice(el.dataset.pickDevice); return; }
+  if (!q('#account-menu') && !q('#btn-account')) closeAccountMenu();
+}
+
+/* ---------------------------------------------------------------------
+   Initialization & Event Listeners
    --------------------------------------------------------------------- */
 function bindEvents() {
-  document.addEventListener('keydown', onKeyDown);
+  document.addEventListener('click', onClick);
+  document.addEventListener('keydown', onKey);
   window.addEventListener('hashchange', route);
+  window.addEventListener('offline', () => toast(t('offline'), { type: 'error' }));
+  window.addEventListener('online', () => { toast(t('online'), { type: 'ok' }); if (!state.homeLoaded && state.view === 'home') loadHome(true); });
 
-  // Global delegated clicks
-  document.addEventListener('click', (e) => {
-    const el = e.target.closest('[data-open],[data-play],[data-resume],[data-remove-cw],[data-close],[data-scroll],[data-dot],[data-open-settings],[data-goto-genre],[data-al-filter],[data-del-review]');
-    if (!el) {
-      if (!e.target.closest('#account-menu, #btn-account')) $('account-menu').hidden = true;
-      return;
-    }
-    if (el.dataset.open) { openDetail(el.dataset.open); return; }
-    if (el.dataset.play) {
-      getMedia(Number(el.dataset.play)).then((m) => { const c = getContinue()[m.id]; openPlayer(m, c ? c.ep : 1); }).catch(() => toast(t('loadErr'), { type: 'error' }));
-      return;
-    }
-    if (el.dataset.resume) { resumeContinue(Number(el.dataset.resume)); return; }
-    if (el.dataset.removeCw) {
-      removeContinue(Number(el.dataset.removeCw));
-      renderContinueRail();
-      if (state.view === 'list') renderList();
-      return;
-    }
-    if (el.hasAttribute('data-close')) { const layer = el.closest('.layer'); if (layer) closeLayer(layer.id); return; }
-    if (el.dataset.scroll) {
-      const rail = $('rail-' + el.dataset.scroll);
-      const dir = Number(el.dataset.dir) * (document.dir === 'rtl' ? -1 : 1);
-      rail.scrollBy({ left: dir * rail.clientWidth * 0.85, behavior: reduceMotion() ? 'auto' : 'smooth' });
-      return;
-    }
-    if (el.dataset.dot) { heroGo(Number(el.dataset.dot)); return; }
-    if (el.hasAttribute('data-open-settings')) { openSettings(); return; }
-    if (el.dataset.gotoGenre) {
-      closeLayer('detail');
-      setTimeout(() => {
-        $('filters').reset();
-        $('f-genre').value = el.dataset.gotoGenre;
-        if (state.view === 'browse') loadBrowse(true); else { $('browse-grid').innerHTML = ''; location.hash = '#/browse'; }
-      }, 50);
-      return;
-    }
-    if (el.dataset.alFilter) { state.alFilter = el.dataset.alFilter; loadAniListList(); return; }
-    if (el.dataset.delReview && state.detail) {
-      setReviews(state.detail.id, getReviews(state.detail.id).filter((r) => r.id !== el.dataset.delReview));
-      renderReviews(state.detail.id);
+  // search
+  const input = $('search-input');
+  input.addEventListener('input', (e) => onSearchInput(e.target.value));
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const q = e.target.value.trim();
+      if (q) location.hash = '#/search?q=' + encodeURIComponent(q);
     }
   });
-
-  // Rails: vertical wheel stays vertical; horizontal trackpad works natively
-
-  // Navbar
-  $('search-form').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const q = $('search-input').value.trim();
-    if (q) { location.hash = '#/search?q=' + encodeURIComponent(q); $('search-input').blur(); }
-  });
-  $('search-input').addEventListener('input', (e) => onSearchInput(e.target.value));
-  $('search-clear').addEventListener('click', () => { $('search-input').value = ''; location.hash = '#/home'; });
+  $('search-form').addEventListener('submit', (e) => e.preventDefault()); // no page reload
+  $('search-clear').addEventListener('click', () => { input.value = ''; location.hash = '#/home'; });
   $('btn-search-mobile').addEventListener('click', () => {
-    if ($('navbar').classList.contains('search-open')) closeMobileSearch(); else openMobileSearch();
+    const nav = $('navbar');
+    nav.classList.toggle('search-open');
+    if (nav.classList.contains('search-open')) input.focus();
   });
   $('btn-surprise').addEventListener('click', surprise);
-  $('btn-settings').addEventListener('click', openSettings);
-  $('btn-account').addEventListener('click', () => {
-    if (!state.token) { login(); return; }
-    $('account-menu').hidden = !$('account-menu').hidden;
-  });
-  $('btn-logout').addEventListener('click', () => logout());
-  $('btn-shortcuts').addEventListener('click', () => openLayer('shortcuts'));
 
-  // Browse filters
-  ['f-year', 'f-season', 'f-format', 'f-genre', 'f-sort'].forEach((id) => $(id).addEventListener('change', () => loadBrowse(true)));
-  $('filters').addEventListener('reset', () => setTimeout(() => loadBrowse(true), 0));
-  $('genre-chips').addEventListener('click', (e) => {
-    const chip = e.target.closest('[data-genre]');
-    if (!chip) return;
-    $('f-genre').value = $('f-genre').value === chip.dataset.genre ? '' : chip.dataset.genre;
-    loadBrowse(true);
-  });
-  $('browse-more').addEventListener('click', () => { if (!state.browse.loading) { state.browse.page++; loadBrowse(false); } });
+  // browse
+  $('filters').addEventListener('change', () => { syncChips(); loadBrowse(true); });
+  $('filters').addEventListener('reset', () => setTimeout(() => { syncChips(); loadBrowse(true); }, 0));
+  $('browse-more').addEventListener('click', () => { if (state.browse.loading || !state.browse.hasNext) return; state.browse.page += 1; loadBrowse(false); });
 
-  // My list
-  const clearHistory = () => {
-    lsDel(K.cont); lsDel(K.watched);
-    renderContinueRail();
-    if (state.view === 'list') renderList();
-    toast(t('historyCleared'), { type: 'ok' });
-  };
+  // list
   $('btn-clear-history').addEventListener('click', clearHistory);
+  $('al-filter').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-al]');
+    if (b) { state.alFilter = b.dataset.al; renderAniListBlock(); }
+  });
 
-  // Detail
-  $('d-play').addEventListener('click', () => { if (state.detail) openPlayer(state.detail, Number($('d-play').dataset.ep) || 1); });
-  $('d-trailer').addEventListener('click', openTrailer);
-  $('d-fav').addEventListener('click', () => { if (state.detail) { toggleFav(state.detail); paintFav(); if (state.view === 'list') renderList(); } });
-  $('d-al-status').addEventListener('change', async (e) => {
+  // detail
+  $('d-play').addEventListener('click', () => {
     const m = state.detail;
-    try {
-      const saved = await saveAniList(m.id, { status: e.target.value });
-      m.mediaListEntry = saved;
-      toast(t('synced'), { type: 'ok' });
-    } catch (err) { toast(t('syncFail'), { type: 'error' }); paintAlStatus(); }
+    if (!m) return;
+    const c = getContinue()[m.id];
+    openPlayer(m, playableEpisode(m, c ? c.ep : 1));
   });
-  $('d-episodes').addEventListener('click', (e) => {
-    const b = e.target.closest('[data-ep]');
-    if (b && state.detail) openPlayer(state.detail, Number(b.dataset.ep));
-  });
-  $('d-ep-range').addEventListener('change', (e) => { state.epPage = Number(e.target.value); renderEpisodes(); });
-  $('d-desc').addEventListener('click', (e) => e.currentTarget.classList.remove('collapsed'));
-  $('detail').querySelector('.stars-input').addEventListener('click', (e) => {
-    const s = e.target.closest('[data-star]');
-    if (!s) return;
-    pendingStars = Number(s.dataset.star);
-    paintStars(pendingStars);
-    $('review-err').hidden = true;
-  });
+  $('d-trailer').addEventListener('click', openTrailer);
+  $('d-fav').addEventListener('click', () => { if (state.detail) { toggleFav(state.detail); paintFav(state.detail); } });
+  $('d-al-status').addEventListener('change', onAlStatus);
+  $('d-ep-range').addEventListener('change', (e) => { state.epPage = Number(e.target.value) || 0; if (state.detail) renderEpisodes(state.detail); });
   $('review-form').addEventListener('submit', submitReview);
+  $('review-form').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-star]');
+    if (b) { state.pendingStars = Number(b.dataset.star); paintStarInput(); $('review-err').hidden = true; }
+  });
+  $('review-list').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-del-review]');
+    if (!b || !state.detail) return;
+    const list = getReviews(state.detail.id);
+    list.splice(Number(b.dataset.delReview), 1);
+    lsSetJSON(K.reviews + state.detail.id, list);
+    renderReviews(state.detail);
+  });
 
-  // Player
-  $('p-prev').addEventListener('click', () => changeEpisode(-1));
-  $('p-next').addEventListener('click', () => changeEpisode(1));
-  $('p-episode').addEventListener('change', (e) => { state.player.ep = Number(e.target.value); paintPlayerChrome(); loadEpisode(); });
-  $('p-reload').addEventListener('click', () => loadEpisode({ reload: true }));
+  // player
+  $('p-prev').addEventListener('click', () => state.player && changeEpisode(state.player.ep - 1));
+  $('p-next').addEventListener('click', () => state.player && changeEpisode(state.player.ep + 1));
+  $('p-episode').addEventListener('change', (e) => changeEpisode(Number(e.target.value)));
+  $('p-reload').addEventListener('click', loadStream);
   $('p-fullscreen').addEventListener('click', toggleFullscreen);
   $('p-audio').addEventListener('click', (e) => {
     const b = e.target.closest('[data-audio]');
-    if (!b || b.dataset.audio === state.player.audio) return;
+    if (!b || !state.player) return;
     state.player.audio = b.dataset.audio;
     lsSet(K.audio, b.dataset.audio);
     paintPlayerChrome();
-    loadEpisode();
+    loadStream();
   });
   $('p-servers').addEventListener('click', (e) => {
-    const b = e.target.closest('[data-server]');
-    if (!b || b.disabled) return;
-    state.player.server = b.dataset.server;
-    paintPlayerChrome();
-    loadEpisode();
+    const b = e.target.closest('[data-srv]');
+    if (!b || !state.player) return;
+    state.player.server = b.dataset.srv;
+    loadStream();
   });
-  document.addEventListener('fullscreenchange', () => {
-    const i = $('p-fullscreen').querySelector('i');
-    i.className = document.fullscreenElement ? 'ph ph-corners-in' : 'ph ph-corners-out';
+  $('embed-player').addEventListener('load', () => {
+    if (state.player && $('embed-player').src !== 'about:blank') $('stage-loading').classList.add('gone');
   });
 
-  // Settings
-  $('s-device').addEventListener('click', (e) => { const b = e.target.closest('[data-device]'); if (b) setDevice(b.dataset.device); });
+  // settings
+  $('btn-settings').addEventListener('click', () => openLayer('settings'));
+  $('s-shortcuts').addEventListener('click', () => openLayer('shortcuts'));
+  $('btn-shortcuts').addEventListener('click', () => openLayer('shortcuts'));
+  $('s-device').addEventListener('click', (e) => { const b = e.target.closest('button[data-device]'); if (b) setDevice(b.dataset.device); });
   $('s-theme').addEventListener('click', (e) => { const b = e.target.closest('[data-theme-opt]'); if (b) setTheme(b.dataset.themeOpt); });
   $('s-lang').addEventListener('change', (e) => setLang(e.target.value));
   $('o-lang').addEventListener('change', (e) => setLang(e.target.value));
-  $('s-default-server').addEventListener('change', (e) => { state.prefs.default = e.target.value; savePrefs(); toast(t('saved'), { type: 'ok', ms: 1800 }); });
+  $('s-nsfw').addEventListener('change', (e) => {
+    state.nsfw = e.target.checked;
+    lsSet(K.nsfw, state.nsfw ? '1' : '0');
+    resetCatalog();
+  });
+  $('s-privacy').addEventListener('change', (e) => {
+    state.privacy = e.target.checked;
+    lsSet(K.privacy, state.privacy ? '1' : '0');
+    renderContinueRail();
+  });
+  $('s-default-server').addEventListener('change', (e) => { state.prefs.default = e.target.value; savePrefs(); toast(t('saved'), { type: 'ok' }); });
   $('s-servers').addEventListener('change', (e) => {
-    const sw = e.target.closest('[data-toggle-server]');
-    if (!sw) return;
-    const id = sw.dataset.toggleServer;
-    const onCount = allEmbedServers().filter((s) => state.prefs.enabled[s.id] !== false).length;
-    if (!sw.checked && onCount <= 1) { sw.checked = true; toast(t('noServer'), { type: 'error' }); return; }
-    state.prefs.enabled[id] = sw.checked;
-    if (!sw.checked && state.prefs.default === id) state.prefs.default = '';
+    const cb = e.target.closest('[data-srv-toggle]');
+    if (!cb) return;
+    state.prefs.enabled[cb.dataset.srvToggle] = cb.checked;
     savePrefs();
-    paintSettings();
+    if (state.player) paintPlayerChrome();
   });
-  $('s-nsfw').addEventListener('change', (e) => { state.nsfw = e.target.checked; lsSet(K.nsfw, state.nsfw ? '1' : '0'); resetCatalog(); });
-  $('s-privacy').addEventListener('change', (e) => { state.privacy = e.target.checked; lsSet(K.privacy, state.privacy ? '1' : '0'); renderContinueRail(); });
-  $('s-client-id').addEventListener('change', (e) => {
-    const v = e.target.value.replace(/\D/g, '');
-    e.target.value = v;
-    if (v) lsSet(K.clientId, v); else lsDel(K.clientId);
-    toast(t('saved'), { type: 'ok', ms: 1800 });
-  });
-  $('s-al-login').addEventListener('click', () => { const v = $('s-client-id').value.replace(/\D/g, ''); if (v) lsSet(K.clientId, v); login(); });
+  $('s-client-id').addEventListener('change', (e) => lsSet(K.clientId, e.target.value.trim()));
+  $('s-al-login').addEventListener('click', () => { lsSet(K.clientId, $('s-client-id').value.trim()); startLogin(); });
   $('s-al-logout').addEventListener('click', () => logout());
   $('s-clear-history').addEventListener('click', clearHistory);
-  $('s-clear-cache').addEventListener('click', () => { pruneQueryCache(true); homeData = null; toast(t('cacheCleared'), { type: 'ok' }); });
-  $('s-shortcuts').addEventListener('click', () => openLayer('shortcuts'));
+  $('s-clear-cache').addEventListener('click', () => { resetCatalog(); toast(t('cacheCleared'), { type: 'ok' }); });
 
-  // Onboarding
-  qsa('[data-pick-device]').forEach((b) => b.addEventListener('click', () => {
-    setDevice(b.dataset.pickDevice, { announce: false });
-    state.stack = state.stack.filter((x) => x !== 'onboarding');
-    $('onboarding').hidden = true;
-    if (!state.stack.length) document.body.classList.remove('locked', 'layer-open');
-    state.lastFocus.pop();
-    if (state.device === 'tv') { const cta = document.querySelector('.hero-slide.on .btn-primary'); if (cta) cta.focus(); }
-  }));
-
-  // Maintenance
-  $('m-retry').addEventListener('click', () => location.reload());
-
-  // Mascot
-  $('mascot-min').addEventListener('click', () => setMascotMin(true));
-  $('mascot-avatar').addEventListener('click', () => {
-    const min = !$('mascot').classList.contains('min');
-    setMascotMin(min);
-    if (!min) { mascotIdx++; mascotSay(); }
-  });
+  // account + maintenance + mascot
+  $('btn-account').addEventListener('click', onAccountClick);
+  $('btn-logout').addEventListener('click', () => logout());
+  $('m-retry').addEventListener('click', loadServersConfig);
+  $('mascot-min').addEventListener('click', toggleMascot);
+  $('mascot-avatar').addEventListener('click', toggleMascot);
   $('mascot-random').addEventListener('click', surprise);
-
-  // Layout
-  if ('ResizeObserver' in window) {
-    const ro = new ResizeObserver(measureChrome);
-    ro.observe($('navbar'));
-    ro.observe($('tabbar'));
-  }
-  window.addEventListener('resize', debounce(measureChrome, 100));
-  window.addEventListener('orientationchange', () => setTimeout(measureChrome, 200));
-
-  // Connectivity
-  window.addEventListener('offline', () => toast(t('offline'), { type: 'error' }));
-  window.addEventListener('online', () => toast(t('online'), { type: 'ok' }));
 }
 
-/* ---------------------------------------------------------------------
-   Service worker
-   --------------------------------------------------------------------- */
-function registerSW() {
+function registerServiceWorker() {
   if (!('serviceWorker' in navigator) || !/^https?:$/.test(location.protocol)) return;
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').then((reg) => {
-      reg.addEventListener('updatefound', () => {
-        const sw = reg.installing;
-        if (!sw) return;
-        sw.addEventListener('statechange', () => {
-          if (sw.state === 'installed' && navigator.serviceWorker.controller) {
-            toast(t('updateReady'), { ms: 12000, action: { label: t('reloadNow'), run: () => location.reload() } });
-          }
-        });
+  navigator.serviceWorker.register('sw.js').then((reg) => {
+    reg.addEventListener('updatefound', () => {
+      const worker = reg.installing;
+      if (!worker) return;
+      worker.addEventListener('statechange', () => {
+        if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+          toast(t('updateReady'), { ms: 15000, action: { label: t('reloadNow'), run: () => location.reload() } });
+        }
       });
-    }).catch(() => {});
-  });
+    });
+  }).catch(() => { /* optional */ });
 }
 
-/* ---------------------------------------------------------------------
-   Boot
-   --------------------------------------------------------------------- */
-async function init() {
-  handleAuthRedirect();
-  loadToken();
-  state.lang = detectLang();
-  document.documentElement.dataset.theme = state.theme;
-  if (state.device) document.documentElement.dataset.device = state.device;
+function initApp() {
+  // runtime-only state
+  Object.assign(state, {
+    alSeq: 0, alEntries: new Map(), hintTimer: null, maintTimer: null,
+    pendingStars: 0, reviewFor: null, detailId: null
+  });
+  if (!state.prefs || typeof state.prefs !== 'object') state.prefs = { enabled: {}, default: '' };
+  if (!state.prefs.enabled || typeof state.prefs.enabled !== 'object') state.prefs.enabled = {};
+
+  // language first: sets <html lang/dir> and the script font (Arabic is RTL)
+  setLang(detectLang(), { rerender: false, persist: false });
+
+  // links and version from the constants, so there is one place to change them
   qsa('[data-github]').forEach((a) => { a.href = GITHUB_URL; });
   qsa('[data-discord]').forEach((a) => { a.href = DISCORD_URL; });
 
-  bindEvents();
-  setLang(state.lang, { rerender: false });
+  // sign-in redirect comes back as #access_token=…
+  captureToken();
+  state.token = readToken();
+
+  // theme / device (the inline script in <head> already painted the saved values)
   setTheme(state.theme);
+  setDevice(state.device || detectDevice(), { persist: false });
+
+  pruneQueryCache();
+  bindEvents();
   buildFilterSelects();
   renderTagline();
   renderAuth();
-  measureChrome();
-  initEmbedProgress();
-
-  maybeOnboard();
-  await loadServersConfig();
   paintSettings();
-  route();
-
-  loadGenres();
-  loadViewer();
   initMascot();
-  registerSW();
-  pruneQueryCache();
+  loadServersConfig();
+  loadGenres();
+  if (state.token) loadViewer(true);
+
+  // first visit: ask which device is being used
+  if (!lsGet(K.device)) {
+    openLayer('onboarding', `[data-pick-device="${state.device}"]`);
+  }
+
+  if (!location.hash || location.hash === '#') history.replaceState(null, '', location.pathname + location.search + '#/home');
+  route();
+  registerServiceWorker();
 }
 
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-else init();
+document.addEventListener('DOMContentLoaded', initApp);
