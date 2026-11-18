@@ -1,6 +1,6 @@
 /* Anime Loft - service worker.
-   Aumente CACHE (animeloft-v6, v7...) a cada atualização dos arquivos para forçar o refresh. */
-const CACHE = 'animeloft-v5';
+   Aumente CACHE (animeloft-v7, v8...) a cada atualização dos arquivos para forçar o refresh. */
+const CACHE = 'animeloft-v6';
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'manifest.json', 'logo.jpg'];
 // CDNs usadas pela interface (scripts, estilos e fontes). APIs, imagens e embeds nunca passam pelo cache.
 const STATIC_HOSTS = ['cdn.tailwindcss.com', 'cdn.plyr.io', 'cdn.jsdelivr.net', 'fonts.googleapis.com', 'fonts.gstatic.com'];
