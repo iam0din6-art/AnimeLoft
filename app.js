@@ -1,9 +1,9 @@
 /* =====================================================================
-   Anime Loft · app.js  ·  v2.1.0 (fix: player + browse + defaults)
+   Anime Loft · app.js  ·  v2.3.0
    ===================================================================== */
 'use strict';
 
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '2.3.0';
 const ANILIST_API = 'https://graphql.anilist.co';
 const SERVERS_URL = 'servers.json';
 const QUERY_TTL = 15 * 60 * 1000;
@@ -20,13 +20,13 @@ const K = {
   mascot: 'loft_mascot_min', onboarded: 'loft_onboarded'
 };
 
-/* MegaPlay e Vidsrc.cc LIGADOS. Os outros 4 DESLIGADOS por padrão. */
 const DEFAULT_SERVERS = {
-  version: 3,
+  version: 4,
   maintenance: false,
   servers: [
     { id: 'megaplay',  label: 'MegaPlay',    type: 'embed', enabled: true,  url: 'https://megaplay.buzz/stream/ani/{anilistId}/{ep}/{audio}' },
-    { id: 'vidsrccc',  label: 'Vidsrc.cc',   type: 'embed', enabled: true,  url: 'https://vidsrc.cc/v2/embed/anime/{anilistId}/{ep}/{audio}' },
+    { id: 'vidplus',   label: 'VidPlus',     type: 'embed', enabled: true,  url: 'https://player.vidplus.to/embed/anime/{anilistId}/{ep}?dub={isDub}' },
+    { id: 'vidsrccc',  label: 'Vidsrc.cc',   type: 'embed', enabled: false, url: 'https://vidsrc.cc/v2/embed/anime/{anilistId}/{ep}/{audio}' },
     { id: 'vidsrcme',  label: 'Vidsrc.me',   type: 'embed', enabled: false, url: 'https://vidsrc.me/embed/anime?mal={malId}&ep={ep}' },
     { id: 'vidsrcnet', label: 'Vidsrc.net',  type: 'embed', enabled: false, url: 'https://vidsrc.net/embed/anime?mal={malId}&ep={ep}' },
     { id: 'vidlink',   label: 'VidLink Pro', type: 'embed', enabled: false, url: 'https://vidlink.pro/anime/{malId}/{ep}/{audio}' },
@@ -37,6 +37,7 @@ const DEFAULT_SERVERS = {
 const GENRES_FALLBACK = ['Action','Adventure','Comedy','Drama','Ecchi','Fantasy','Horror','Mahou Shoujo','Mecha','Music','Mystery','Psychological','Romance','Sci-Fi','Slice of Life','Sports','Supernatural','Thriller'];
 const QUICK_GENRES = ['Action','Romance','Comedy','Fantasy','Sci-Fi','Slice of Life','Mystery','Sports','Psychological','Supernatural'];
 
+/* ---------- Helpers ---------- */
 const $ = (id) => document.getElementById(id);
 const qsa = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 const lsGet = (k, f=null) => { try { const v = localStorage.getItem(k); return v===null?f:v; } catch(e){ return f; } };
@@ -51,6 +52,7 @@ function debounce(fn, ms) { let t; return (...a)=>{ clearTimeout(t); t=setTimeou
 function hashStr(s) { let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))|0; return (h>>>0).toString(36); }
 const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+/* ---------- i18n ---------- */
 const I18N = window.LOFT_I18N || { languages:[{code:'en',name:'English',dir:'ltr'}], strings:{ en:{} } };
 const FONT_FOR = { zh:'Noto+Sans+SC:wght@400;500;600;700', hi:'Noto+Sans+Devanagari:wght@400;500;600;700', ar:'Noto+Sans+Arabic:wght@400;500;600;700', bn:'Noto+Sans+Bengali:wght@400;500;600;700' };
 
@@ -98,19 +100,34 @@ function fillLangSelects() {
   });
 }
 
+/* ---------- State ---------- */
 const state = {
-  lang: 'en', device: lsGet(K.device), theme: lsGet(K.theme, 'dark'),
-  nsfw: lsGet(K.nsfw) === '1', privacy: lsGet(K.privacy) === '1',
+  lang: 'en',
+  device: lsGet(K.device),
+  theme: lsGet(K.theme, 'dark'),
+  nsfw: lsGet(K.nsfw) === '1',
+  privacy: lsGet(K.privacy) === '1',
   config: DEFAULT_SERVERS,
   prefs: lsJSON(K.servers, { enabled: {}, default: '' }),
-  token: lsGet(K.token) || null, viewer: null, view: 'home',
-  media: new Map(), detail: null, player: null, audio: lsGet(K.audio, 'sub'),
+  token: lsGet(K.token) || null,
+  viewer: null,
+  view: 'home',
+  media: new Map(),
+  detail: null,
+  player: null,
+  audio: lsGet(K.audio, 'sub'),
   browse: { page: 1, hasNext: false, loading: false, seq: 0 },
-  searchSeq: 0, hero: { items: [], index: 0, timer: null },
-  stack: [], lastFocus: [], genres: GENRES_FALLBACK,
-  alFilter: 'CURRENT', homeLoaded: false, starDraft: 0
+  searchSeq: 0,
+  hero: { items: [], index: 0, timer: null },
+  stack: [],
+  lastFocus: [],
+  genres: GENRES_FALLBACK,
+  alFilter: 'CURRENT',
+  homeLoaded: false,
+  starDraft: 0
 };
 
+/* ---------- Toast ---------- */
 function toast(msg, { type = 'info', action = null, ms = 4200 } = {}) {
   const icon = { info:'ph-info', ok:'ph-check-circle', error:'ph-warning-circle' }[type] || 'ph-info';
   const el = document.createElement('div'); el.className = `toast ${type}`;
@@ -123,6 +140,7 @@ function toast(msg, { type = 'info', action = null, ms = 4200 } = {}) {
   setTimeout(dismiss, ms);
 }
 
+/* ---------- AniList ---------- */
 const MEDIA_FIELDS = `
   id idMal type
   title { romaji english native userPreferred }
@@ -135,7 +153,6 @@ const MEDIA_FIELDS = `
   trailer { id site }
   relations { edges { relationType node { id idMal type title { romaji english native userPreferred } coverImage { extraLarge large color } format seasonYear averageScore status episodes isAdult } } }
 `;
-
 const adultVar = () => state.nsfw ? null : false;
 
 async function gql(query, variables = {}, { auth = false, cache = true } = {}) {
@@ -156,7 +173,7 @@ async function gql(query, variables = {}, { auth = false, cache = true } = {}) {
       await new Promise(r=>setTimeout(r, wait*1000)); continue;
     }
     const json = await res.json().catch(()=>({}));
-    if (res.status === 401) { if (useAuth) { logout(true); } throw new Error('unauthorized'); }
+    if (res.status === 401) { if (useAuth) logout(true); throw new Error('unauthorized'); }
     if (!res.ok || json.errors) throw new Error((json.errors && json.errors[0] && json.errors[0].message) || `HTTP ${res.status}`);
     if (cache && !useAuth) { try { sessionStorage.setItem(cacheKey, JSON.stringify({ at: Date.now(), data: json.data })); } catch(e){} }
     return json.data;
@@ -198,6 +215,7 @@ function fmtLabel(f) { if (!f) return ''; return ['MOVIE','SPECIAL','TV_SHORT'].
 function fmtTime(s) { s = Math.floor(s||0); const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
   return (h ? `${h}:${String(m).padStart(2,'0')}` : `${m}`) + `:${String(sec).padStart(2,'0')}`; }
 
+/* ---------- Layers ---------- */
 function isOpen(id) { return state.stack.includes(id); }
 function openLayer(id, focusEl) {
   const el = $(id); if (!el || !el.hidden) return;
@@ -222,6 +240,7 @@ function closeLayer(id) {
 }
 function closeTop() { if (!state.stack.length) return false; closeLayer(state.stack[state.stack.length - 1]); return true; }
 
+/* ---------- Cards ---------- */
 function cardHTML(m, { progress = null } = {}) {
   const title = titleOf(m);
   const score = m.averageScore ? `<span class="badge badge-score"><i class="ph-fill ph-star"></i>${(m.averageScore/10).toFixed(1)}</span>` : '<span></span>';
@@ -251,6 +270,7 @@ function errorHTML(retryFn) {
   return emptyHTML('ph-cloud-slash', t('loadErr'), `<button type="button" id="${id}" class="btn btn-primary btn-sm"><i class="ph ph-arrow-clockwise"></i>${esc(t('retry'))}</button>`);
 }
 
+/* ---------- Router ---------- */
 function parseHash() {
   const h = location.hash.replace(/^#\/?/, '');
   const [path, query=''] = h.split('?');
@@ -274,6 +294,7 @@ function showView(view) {
   document.title = view === 'home' ? 'Anime Loft · open source anime streaming' : `${t(view === 'list' ? 'myList' : view === 'browse' ? 'browse' : 'searchPh')} · Anime Loft`;
 }
 
+/* ---------- Home ---------- */
 const HOME_QUERY = `query($season: MediaSeason, $year: Int, $nSeason: MediaSeason, $nYear: Int, $adult: Boolean) {
   trending: Page(perPage: 20) { media(type: ANIME, sort: TRENDING_DESC, isAdult: $adult) { ${MEDIA_FIELDS} } }
   season:   Page(perPage: 20) { media(type: ANIME, season: $season, seasonYear: $year, sort: POPULARITY_DESC, isAdult: $adult) { ${MEDIA_FIELDS} } }
@@ -282,13 +303,11 @@ const HOME_QUERY = `query($season: MediaSeason, $year: Int, $nSeason: MediaSeaso
   upcoming: Page(perPage: 20) { media(type: ANIME, season: $nSeason, seasonYear: $nYear, sort: POPULARITY_DESC, isAdult: $adult) { ${MEDIA_FIELDS} } }
   movies:   Page(perPage: 20) { media(type: ANIME, format: MOVIE, sort: [SCORE_DESC, POPULARITY_DESC], isAdult: $adult) { ${MEDIA_FIELDS} } }
 }`;
-
 const HOME_ROWS = [
   { key:'trending', label:'rowTrending' }, { key:'season', label:'rowSeason' },
   { key:'airing',   label:'rowAiring'   }, { key:'top',    label:'rowTop' },
   { key:'upcoming', label:'rowUpcoming' }, { key:'movies', label:'rowMovies' }
 ];
-
 function rowShell(id, label) {
   return `<section class="row" aria-labelledby="h-${id}">
     <div class="row-head"><h2 class="heading-5" id="h-${id}">${esc(t(label))}</h2>
@@ -299,7 +318,6 @@ function rowShell(id, label) {
     <div class="rail" id="rail-${id}">${skeletonCards(8)}</div>
   </section>`;
 }
-
 let homeData = null;
 async function loadHome(force = false) {
   renderContinueRail();
@@ -361,6 +379,7 @@ function heroGo(i) {
 function startHero() { stopHero(); if (state.view !== 'home' || state.hero.items.length < 2 || reduceMotion()) return; state.hero.timer = setTimeout(()=>heroGo(state.hero.index+1), HERO_INTERVAL); }
 function stopHero() { clearTimeout(state.hero.timer); state.hero.timer = null; }
 
+/* ---------- Continue / Watched / Favs ---------- */
 const getContinue = () => lsJSON(K.cont, {});
 function saveContinue(anime, ep, time=0, duration=0) {
   const all = getContinue(); const prev = all[anime.id] || {};
@@ -374,7 +393,6 @@ function saveContinue(anime, ep, time=0, duration=0) {
 }
 function removeContinue(id) { const all = getContinue(); delete all[id]; lsSetJSON(K.cont, all); }
 const continueList = () => Object.values(getContinue()).sort((a,b)=>b.updated-a.updated);
-
 const getWatched = id => (lsJSON(K.watched, {})[id]) || [];
 function markWatched(id, ep) {
   const all = lsJSON(K.watched, {});
@@ -382,7 +400,6 @@ function markWatched(id, ep) {
   all[id] = Array.from(set).sort((a,b)=>a-b);
   lsSetJSON(K.watched, all);
 }
-
 const getFavs = () => lsJSON(K.favs, []);
 const isFav = id => getFavs().some(f => f.id === id);
 function toggleFav(m) {
@@ -393,7 +410,6 @@ function toggleFav(m) {
   toast(t(on ? 'favAdded' : 'favRemoved'), { type:'ok' });
   return on;
 }
-
 function cwCardHTML(c) {
   const pct = c.duration ? Math.min(1, c.time / c.duration) : (c.total ? Math.min(1, c.ep / c.total) : 0);
   const time = c.time ? ` · ${fmtTime(c.time)}` : '';
@@ -424,6 +440,7 @@ async function resumeContinue(id) {
   openPlayer(m, c ? c.ep : 1);
 }
 
+/* ---------- Search ---------- */
 const SEARCH_QUERY = `query($q: String, $adult: Boolean) {
   Page(perPage: 40) { media(type: ANIME, search: $q, sort: SEARCH_MATCH, isAdult: $adult) { ${MEDIA_FIELDS} } }
 }`;
@@ -449,13 +466,13 @@ const onSearchInput = debounce((q) => {
   else location.hash = hash;
 }, 420);
 
+/* ---------- Browse (Bug corrigido) ---------- */
 const BROWSE_QUERY = `query($page: Int, $season: MediaSeason, $seasonYear: Int, $from: FuzzyDateInt, $to: FuzzyDateInt, $format: MediaFormat, $genre: String, $sort: [MediaSort], $adult: Boolean) {
   Page(page: $page, perPage: 30) {
     pageInfo { hasNextPage total }
     media(type: ANIME, season: $season, seasonYear: $seasonYear, startDate_greater: $from, startDate_lesser: $to, format: $format, genre: $genre, sort: $sort, isAdult: $adult) { ${MEDIA_FIELDS} }
   }
 }`;
-
 function buildFilterSelects() {
   const yearSel = $('f-year'); if (!yearSel) return;
   const keepYear = yearSel.value;
@@ -463,12 +480,10 @@ function buildFilterSelects() {
   let html = `<option value="">${esc(t('any'))}</option>`;
   for (let y = now; y >= 1960; y--) html += `<option value="${y}">${y}</option>`;
   yearSel.innerHTML = html; yearSel.value = keepYear;
-
   const genreSel = $('f-genre'); const keepGenre = genreSel.value;
   const genres = state.genres.filter(g => state.nsfw || g !== 'Hentai');
   genreSel.innerHTML = `<option value="">${esc(t('any'))}</option>` + genres.map(g => `<option value="${esc(g)}">${esc(g)}</option>`).join('');
   genreSel.value = genres.includes(keepGenre) ? keepGenre : '';
-
   $('genre-chips').innerHTML = QUICK_GENRES.map(g => `<button type="button" class="chip" data-genre="${esc(g)}" aria-pressed="${genreSel.value===g}">${esc(g)}</button>`).join('');
 }
 async function loadGenres() {
@@ -477,7 +492,6 @@ async function loadGenres() {
     if (Array.isArray(d.GenreCollection) && d.GenreCollection.length) { state.genres = d.GenreCollection; buildFilterSelects(); }
   } catch (e) {}
 }
-/* ✅ BUG 2 CORRIGIDO: FuzzyDateInt válido */
 function browseVars(page) {
   const yearRaw = $('f-year').value;
   const year = yearRaw ? Number(yearRaw) : null;
@@ -525,6 +539,7 @@ async function getMedia(id) {
   return data.Media;
 }
 
+/* ---------- Detail ---------- */
 async function openDetail(id) {
   const existing = state.media.get(id);
   openLayer('detail');
@@ -589,6 +604,7 @@ function renderRelated(m) {
   rail.innerHTML = related.map(x => cardHTML(x)).join('');
 }
 
+/* ---------- Reviews ---------- */
 function reviewsKey(id) { return K.reviews + id; }
 const getReviews = id => lsJSON(reviewsKey(id), []);
 function saveReview(id, r) { const all = getReviews(id); all.unshift(r); lsSetJSON(reviewsKey(id), all); }
@@ -629,36 +645,40 @@ async function onAlStatusChange(e) {
   } catch (e) { toast(t('syncFail'), { type:'error' }); }
 }
 
-/* ✅ BUG 1 CORRIGIDO: monta URL real; retorna null se falta dado */
+/* ---------- Player (bugs corrigidos) ---------- */
 function buildServerURL(server, media, ep, audio) {
   if (!server || !server.url) return null;
   let url = server.url;
   const anilistId = media && media.id != null ? String(media.id) : '';
   const malId = media && media.idMal != null ? String(media.idMal) : '';
   const epStr = String(ep || 1);
-  const audioStr = audio === 'dub' ? 'dub' : 'sub';
+  const isDub = audio === 'dub' ? 'true' : 'false';
+
   if (url.includes('{malId}') && !malId) return null;
   if (url.includes('{anilistId}') && !anilistId) return null;
-  url = url.replace(/\{malId\}/g, malId).replace(/\{anilistId\}/g, anilistId)
-           .replace(/\{ep\}/g, epStr).replace(/\{audio\}/g, audioStr)
-           .replace(/\{season\}/g, String((media && media.seasonYear) || ''));
+
+  url = url
+    .replace(/\{malId\}/g, malId)
+    .replace(/\{anilistId\}/g, anilistId)
+    .replace(/\{ep\}/g, epStr)
+    .replace(/\{audio\}/g, audio === 'dub' ? 'dub' : 'sub')
+    .replace(/\{isDub\}/g, isDub)
+    .replace(/\{season\}/g, String((media && media.seasonYear) || ''));
+
   if (/\{[a-zA-Z]+\}/.test(url)) return null;
   return url;
 }
-
 function enabledServers() {
   const cfg = state.config.servers || [];
   const enabled = state.prefs.enabled || {};
   return cfg.filter(s => enabled[s.id] !== false && s.enabled !== false);
 }
-
-/* Ordem de prioridade: MegaPlay → Vidsrc.cc → resto */
 function pickPlayableServer(media, ep, preferredId) {
   const list = enabledServers(); if (!list.length) return null;
   const audio = state.audio || 'sub';
   const order = [];
   if (preferredId) { const p = list.find(s => s.id === preferredId); if (p) order.push(p); }
-  ['megaplay','vidsrccc'].forEach(id => { const s = list.find(x => x.id === id); if (s && !order.includes(s)) order.push(s); });
+  ['megaplay','vidplus','vidsrccc'].forEach(id => { const s = list.find(x => x.id === id); if (s && !order.includes(s)) order.push(s); });
   list.forEach(s => { if (!order.includes(s)) order.push(s); });
   for (const s of order) {
     const url = buildServerURL(s, media, ep, audio);
@@ -666,7 +686,6 @@ function pickPlayableServer(media, ep, preferredId) {
   }
   return null;
 }
-
 async function openPlayer(media, ep = 1) {
   if (!media) return;
   let full = media;
@@ -683,7 +702,6 @@ async function openPlayer(media, ep = 1) {
   paintPlayerChrome();
   loadPlayerSource();
 }
-
 function paintPlayerChrome() {
   const p = state.player; if (!p) return;
   const m = p.media;
@@ -701,7 +719,6 @@ function paintPlayerChrome() {
     return `<button type="button" class="srv" role="radio" aria-checked="${on}" data-server="${s.id}"${ok?'':' aria-disabled="true"'}>${esc(s.label)}</button>`;
   }).join('');
 }
-
 function loadPlayerSource() {
   const p = state.player; if (!p) return;
   const chosen = pickPlayableServer(p.media, p.ep, p.serverId);
@@ -730,8 +747,26 @@ function loadPlayerSource() {
 function switchServer(serverId) { const p = state.player; if (!p) return; p.serverId = serverId; loadPlayerSource(); paintPlayerChrome(); }
 function nextEp() { const p = state.player; if (!p) return; const total = totalEpisodes(p.media); if (p.ep >= total) { toast(t('lastEp')); return; } p.ep += 1; saveContinue(p.media, p.ep); paintPlayerChrome(); loadPlayerSource(); }
 function prevEp() { const p = state.player; if (!p) return; if (p.ep <= 1) return; p.ep -= 1; saveContinue(p.media, p.ep); paintPlayerChrome(); loadPlayerSource(); }
-function setAudio(audio) { const p = state.player; if (!p) return; if (p.audio === audio) return; p.audio = audio; lsSet(K.audio, audio); paintPlayerChrome(); loadPlayerSource(); }
+function setAudio(audio) {
+  const p = state.player; if (!p) return;
+  if (p.audio === audio) return;
+  p.audio = audio;
+  lsSet(K.audio, audio);
+  paintPlayerChrome();
+  loadPlayerSource();
 
+  if (audio === 'dub') {
+    const srv = p.serverId || '';
+    const dubFriendly = ['megaplay','vidplus','vidsrccc'].includes(srv);
+    if (!dubFriendly) {
+      toast('Este servidor não suporta dublagem. Tente MegaPlay ou VidPlus.', { type: 'error', ms: 6000 });
+    } else {
+      toast('Solicitando versão dublada. Se o servidor não tiver dublagem, o player mostrará erro.', { type: 'info', ms: 6000 });
+    }
+  }
+}
+
+/* ---------- Servers config ---------- */
 async function loadServersConfig() {
   try {
     const res = await fetch(SERVERS_URL, { cache: 'no-store' });
@@ -739,10 +774,11 @@ async function loadServersConfig() {
       const cfg = await res.json();
       if (cfg && Array.isArray(cfg.servers) && cfg.servers.length) state.config = cfg;
     }
-  } catch (e) { /* servers.json opcional */ }
+  } catch (e) {}
   if (!state.config || !state.config.servers) state.config = DEFAULT_SERVERS;
 }
 
+/* ---------- Settings ---------- */
 function paintSettings() {
   qsa('#s-device [data-device]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.device === state.device)));
   qsa('#s-theme [data-theme-opt]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.themeOpt === state.theme)));
@@ -767,6 +803,7 @@ function paintSettings() {
   const version = $('s-version'); if (version) version.textContent = t('version', { v: APP_VERSION });
 }
 
+/* ---------- AniList auth ---------- */
 async function login() {
   const cid = (CONFIG.anilistClientId || $('s-client-id').value || '').trim();
   if (!cid) { toast(t('alNeedId')); return; }
@@ -804,6 +841,7 @@ function renderAuth() {
   } else { label.textContent = t('login'); avatar.style.backgroundImage = ''; avatar.innerHTML = '<i class="ph ph-user"></i>'; }
 }
 
+/* ---------- List view ---------- */
 function renderList() {
   const list = continueList();
   const cont = $('list-continue');
@@ -833,6 +871,7 @@ async function loadAniListList() {
   } catch (e) { box.innerHTML = errorHTML(loadAniListList); }
 }
 
+/* ---------- Mascot + tagline ---------- */
 function renderTagline() {
   const el = $('tagline-text'); if (!el) return;
   const raw = t('tagline') || '';
@@ -858,6 +897,7 @@ function initMascot() {
   mascotSay(true);
 }
 
+/* ---------- Onboarding ---------- */
 function applyDevice(device) { state.device = device; lsSet(K.device, device); document.documentElement.dataset.device = device; paintSettings(); }
 function applyTheme(theme) { state.theme = theme; lsSet(K.theme, theme); document.documentElement.dataset.theme = theme; paintSettings(); }
 function maybeOnboard() {
@@ -874,6 +914,7 @@ function maybeOnboard() {
   });
 }
 
+/* ---------- Keyboard ---------- */
 function initKeyboard() {
   document.addEventListener('keydown', (e) => {
     const tag = (e.target && e.target.tagName || '').toLowerCase();
@@ -892,6 +933,7 @@ function toggleFullscreen() {
   else shell.requestFullscreen().catch(()=>{});
 }
 
+/* ---------- Global clicks ---------- */
 function bindGlobalClicks() {
   document.addEventListener('click', (e) => {
     const el = e.target.closest('[data-open], [data-play], [data-play-ep], [data-resume], [data-remove-cw], [data-star], [data-del-review], [data-server], [data-audio], [data-genre], [data-scroll], [data-dot], [data-close], [data-toggle-server], [data-al-filter], [data-theme-opt], [data-device], [data-open-settings]');
@@ -917,6 +959,7 @@ function bindGlobalClicks() {
   });
 }
 
+/* ---------- Navbar handlers ---------- */
 function bindNavbar() {
   const acc = $('btn-account'), menu = $('account-menu');
   acc.addEventListener('click', () => { if (!state.token) { openLayer('settings'); return; } menu.hidden = !menu.hidden; });
@@ -974,6 +1017,7 @@ function bindNavbar() {
   $('m-retry').addEventListener('click', () => location.reload());
 }
 
+/* ---------- Init ---------- */
 async function initApp() {
   if (handleOAuthCallback()) {}
   state.lang = detectLang(); state.theme = lsGet(K.theme, 'dark'); state.audio = lsGet(K.audio, 'sub');
