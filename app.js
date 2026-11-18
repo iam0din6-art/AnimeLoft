@@ -23,7 +23,7 @@ const API_INSTANCES = [
 // Comunidade oficial
 const DISCORD_URL = 'https://discord.gg/3qeKkseWSs';
 // Repositório open source: troque pelo endereço real (se ficar vazio, os botões do GitHub somem)
-const GITHUB_URL = 'https://github.com/SEU-USUARIO/anime-loft';
+const GITHUB_URL = 'https://github.com/iam0din6-art/AnimeLoft';
 
 // Arquivo de controle (bandeira de manutenção + lista de servidores). Pode apontar para uma URL remota
 // (nesse caso o host precisa liberar CORS). Se falhar, o app usa a última cópia salva ou o padrão abaixo.
