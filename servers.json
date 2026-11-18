@@ -1,38 +1,86 @@
 {
+  "version": 2,
   "maintenance": false,
-  "maintenanceMessage": "Estamos atualizando nossos servidores e aplicando melhorias no Anime Loft. Voltamos em instantes!",
+  "message": {
+    "pt": "Estamos melhorando o Anime Loft. Volte em alguns minutos.",
+    "en": "We are improving Anime Loft. Please come back in a few minutes.",
+    "es": "Estamos mejorando Anime Loft. Vuelve en unos minutos.",
+    "bn": "আমরা Anime Loft উন্নত করছি। কয়েক মিনিট পরে আবার আসুন।"
+  },
   "servers": [
     {
-      "id": "vidsrc_me",
-      "label": "Servidor 1 (Vidsrc.me)",
+      "id": "vidsrcme",
+      "label": "Vidsrc.me",
       "type": "embed",
-      "template": "https://vidsrc.me/embed/anime?anilist={id}&episode={ep}",
       "enabled": true,
-      "auto": true
+      "auto": true,
+      "url": "https://vidsrc.me/embed/anime/ani{anilistId}/{ep}/{audio}",
+      "health": "https://vidsrc.me/",
+      "note": "Padrão de URL não validado: teste e ajuste antes de depender deste servidor."
     },
     {
-      "id": "vidsrc_net",
-      "label": "Servidor 2 (Vidsrc.net)",
+      "id": "vidsrcnet",
+      "label": "Vidsrc.net",
       "type": "embed",
-      "template": "https://vidsrc.net/embed/anime?anilist={id}&episode={ep}",
       "enabled": true,
-      "auto": true
+      "auto": true,
+      "url": "https://vidsrc.net/embed/anime/ani{anilistId}/{ep}/{audio}",
+      "health": "https://vidsrc.net/",
+      "note": "Padrão de URL não validado: teste e ajuste antes de depender deste servidor."
     },
     {
       "id": "vidlink",
-      "label": "Servidor 3 (VidLink Pro)",
+      "label": "VidLink Pro",
       "type": "embed",
-      "template": "https://vidlink.pro/anime/{id}/{ep}/sub",
       "enabled": true,
-      "auto": true
+      "auto": true,
+      "url": "https://vidlink.pro/anime/{malId}/{ep}/{audio}",
+      "health": "https://vidlink.pro/",
+      "note": "Padrão de URL não validado: teste e ajuste antes de depender deste servidor."
     },
     {
       "id": "multiembed",
-      "label": "Servidor 4 (MultiEmbed)",
+      "label": "MultiEmbed",
       "type": "embed",
-      "template": "https://multiembed.mov/directstream.php?video_id={id}&anilist=1&s=1&e={ep}",
       "enabled": true,
-      "auto": true
+      "auto": true,
+      "url": "https://multiembed.mov/directstream.php?video_id={anilistId}&s=1&e={ep}",
+      "health": "https://multiembed.mov/",
+      "note": "Padrão de URL não validado: teste e ajuste antes de depender deste servidor."
+    },
+    {
+      "id": "vidsrccc",
+      "label": "Vidsrc.cc",
+      "type": "embed",
+      "enabled": true,
+      "auto": true,
+      "url": "https://vidsrc.cc/v2/embed/anime/ani{anilistId}/{ep}/{audio}",
+      "health": "https://vidsrc.cc/"
+    },
+    {
+      "id": "megaplay",
+      "label": "MegaPlay",
+      "type": "embed",
+      "enabled": true,
+      "auto": true,
+      "url": "https://megaplay.buzz/stream/ani/{anilistId}/{ep}/{audio}",
+      "health": "https://megaplay.buzz/"
+    },
+    {
+      "id": "s1",
+      "label": "Direto 1 (gogoanime)",
+      "type": "api",
+      "provider": "gogoanime",
+      "enabled": false,
+      "auto": false
+    },
+    {
+      "id": "s2",
+      "label": "Direto 2 (HiAnime)",
+      "type": "api",
+      "provider": "zoro",
+      "enabled": false,
+      "auto": false
     }
   ]
 }
