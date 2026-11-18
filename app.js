@@ -111,6 +111,7 @@ const DEFAULT_SERVERS_CONFIG = {
 // Preenchidos por applyServersConfig() na inicialização
 let SERVERS = {};
 let SERVER_ORDER = [];
+let ALL_SERVERS = []; // embeds da configuração (inclui os que o usuário desligou nas Configurações)
 
 // Tempo máximo para o iframe carregar antes de trocar de servidor
 const EMBED_TIMEOUT_MS = 4500;
@@ -159,6 +160,9 @@ const state = {
   theme: 'dark',         // 'dark' | 'oled'
   nsfw: false,           // mostrar conteúdo +18 (Hentai/Ecchi)?
   privacy: false,        // modo privacidade (oculta o histórico da home)
+  device: 'pc',          // 'pc' | 'tv' | 'mobile' (chave loft_device_mode)
+  disabledServers: [],   // provedores desligados pelo usuário
+  cfg: null,             // última configuração de servidores aplicada
   lang: localStorage.getItem('animeloft_lang') || ({ pt: 'pt', en: 'en', es: 'es', bn: 'bn' }[(navigator.language || 'pt').slice(0, 2)] || 'en')
 };
 const mediaCache = new Map(); // id -> objeto Media
@@ -204,7 +208,7 @@ function openModal(id) {
 }
 function closeModal(id) {
   $(id).classList.add('hidden');
-  const anyOpen = ['anime-modal', 'player-modal', 'trailer-modal', 'settings-modal', 'maintenance'].some((m) => !$(m).classList.contains('hidden'));
+  const anyOpen = ['anime-modal', 'player-modal', 'trailer-modal', 'settings-modal', 'onboarding', 'maintenance'].some((m) => !$(m).classList.contains('hidden'));
   if (!anyOpen) document.body.classList.remove('modal-open');
 }
 
@@ -1175,9 +1179,14 @@ function bindEvents() {
   $('settings-close').addEventListener('click', closeSettings);
   $('settings-modal').addEventListener('click', (e) => { if (!e.target.closest('.modal-panel')) closeSettings(); });
   document.querySelectorAll('[data-theme-set]').forEach((b) => b.addEventListener('click', () => setTheme(b.dataset.themeSet)));
-  $('set-server').addEventListener('change', onDefaultServerChange);
+  $('set-providers').addEventListener('change', onProvidersChange);
   $('set-nsfw').addEventListener('change', onNsfwChange);
   $('set-privacy').addEventListener('change', onPrivacyChange);
+  document.querySelectorAll('[data-device-set]').forEach((b) => b.addEventListener('click', () => setDevice(b.dataset.deviceSet)));
+
+  // Onboarding de dispositivo
+  document.querySelectorAll('.ob-option').forEach((b) => b.addEventListener('click', () => chooseDevice(b.dataset.device)));
+  document.querySelectorAll('[data-ob-lang]').forEach((b) => b.addEventListener('click', () => setLang(b.dataset.obLang)));
 
   // Filtros avançados e controles do player
   ['f-year', 'f-season', 'f-format', 'f-genre'].forEach((id) => $(id).addEventListener('change', applyFilters));
@@ -1376,6 +1385,20 @@ const I18N = {
   switchServer: ['Trocar servidor', 'Switch server', 'Cambiar servidor', 'সার্ভার বদলান'],
   reloadPlayer: ['🔄 Recarregar Player', '🔄 Reload Player', '🔄 Recargar reproductor', '🔄 প্লেয়ার রিলোড'],
   aniListList: ['Lista do AniList', 'AniList list', 'Lista de AniList', 'AniList তালিকা'],
+  deviceTitle: ['Qual dispositivo você está usando?', 'Which device are you using?', '¿Qué dispositivo estás usando?', 'আপনি কোন ডিভাইস ব্যবহার করছেন?'],
+  deviceSub: ['Vamos ajustar o tamanho dos cards e a navegação para você.', 'We will adjust card sizes and navigation for you.', 'Ajustaremos el tamaño de las tarjetas y la navegación para ti.', 'আপনার জন্য কার্ডের আকার ও নেভিগেশন ঠিক করে দেব।'],
+  devPC: ['Computador (PC)', 'Computer (PC)', 'Computadora (PC)', 'কম্পিউটার (PC)'],
+  devTV: ['Smart TV / Console', 'Smart TV / Console', 'Smart TV / Consola', 'স্মার্ট টিভি / কনসোল'],
+  devMobile: ['Celular / Tablet', 'Phone / Tablet', 'Móvil / Tablet', 'মোবাইল / ট্যাবলেট'],
+  devPCHint: ['Mouse e teclado', 'Mouse and keyboard', 'Ratón y teclado', 'মাউস ও কীবোর্ড'],
+  devTVHint: ['Controle remoto e foco por setas', 'Remote and arrow-key focus', 'Mando y foco con flechas', 'রিমোট ও অ্যারো-কী ফোকাস'],
+  devMobileHint: ['Toque na tela', 'Touchscreen', 'Pantalla táctil', 'টাচস্ক্রিন'],
+  devRec: ['Recomendado', 'Recommended', 'Recomendado', 'প্রস্তাবিত'],
+  deviceHint: ['Você pode mudar isso depois em ⚙️ Configurações.', 'You can change this later in ⚙️ Settings.', 'Puedes cambiarlo después en ⚙️ Configuración.', 'পরে ⚙️ সেটিংসে এটি বদলাতে পারবেন।'],
+  deviceLabel: ['Dispositivo atual', 'Current device', 'Dispositivo actual', 'বর্তমান ডিভাইস'],
+  providers: ['Provedores de stream', 'Stream providers', 'Proveedores de stream', 'স্ট্রিম প্রোভাইডার'],
+  providersHint: ['Escolha o padrão (●) e ligue ou desligue cada provedor.', 'Pick the default (●) and turn each provider on or off.', 'Elige el predeterminado (●) y activa o desactiva cada proveedor.', 'ডিফল্ট (●) বেছে নিন এবং প্রতিটি প্রোভাইডার চালু/বন্ধ করুন।'],
+  provMin: ['Mantenha pelo menos um provedor ligado.', 'Keep at least one provider on.', 'Mantén al menos un proveedor activado.', 'কমপক্ষে একটি প্রোভাইডার চালু রাখুন।'],
   st_FINISHED: ['Finalizado', 'Finished', 'Finalizado', 'সমাপ্ত'],
   st_RELEASING: ['Em exibição', 'Releasing', 'En emisión', 'চলমান'],
   st_NOT_YET_RELEASED: ['Em breve', 'Upcoming', 'Próximamente', 'শীঘ্রই আসছে'],
@@ -2049,7 +2072,7 @@ function setMascotMin(min) {
 async function initMascot() {
   renderMascot();
   $('mascot-name').textContent = 'Yuki Nagato';
-  paintMascot(localStorage.getItem(MASCOT_KEY) === '1');
+  paintMascot(lsGet(MASCOT_KEY) === '1' || (state.device === 'tv' && lsGet(MASCOT_KEY) === null)); // na TV a mascote começa minimizada
   try { state.adChar = (await gqlCached(CHARACTER_QUERY, { search: 'Yuki Nagato' })).Character; }
   catch (err) { console.warn('Personagem indisponível:', err); state.adChar = null; }
   const c = state.adChar;
@@ -2092,7 +2115,7 @@ function healStorage() {
 }
 
 function syncBodyLock() {
-  const open = ['anime-modal', 'player-modal', 'trailer-modal', 'settings-modal', 'maintenance'].some((m) => !$(m).classList.contains('hidden'));
+  const open = ['anime-modal', 'player-modal', 'trailer-modal', 'settings-modal', 'onboarding', 'maintenance'].some((m) => !$(m).classList.contains('hidden'));
   document.body.classList.toggle('modal-open', open);
 }
 
@@ -2205,7 +2228,10 @@ function validateServersConfig(cfg) {
 }
 
 function applyServersConfig(cfg) {
-  const list = cfg.servers.filter((s) => s.enabled !== false);
+  state.cfg = cfg;
+  const all = cfg.servers.filter((s) => s.enabled !== false);
+  ALL_SERVERS = all.filter((s) => s.type === 'embed');
+  const list = all.filter((s) => !state.disabledServers.includes(s.id)); // respeita o que o usuário desligou
   SERVERS = Object.fromEntries(list.map((s) => [s.id, s]));
   SERVER_ORDER = list.filter((s) => s.auto !== false && s.type === 'embed').map((s) => s.id);
   if (!SERVERS[state.preferredServer]) state.preferredServer = SERVER_ORDER[0] || Object.keys(SERVERS)[0] || '';
@@ -2315,6 +2341,7 @@ const THEME_KEY = 'animeloft_theme';
 const DEFAULT_SERVER_KEY = 'animeloft_default_server';
 const NSFW_KEY = 'animeloft_nsfw';
 const PRIVACY_KEY = 'animeloft_privacy';
+const DISABLED_SERVERS_KEY = 'animeloft_disabled_servers';
 
 function lsGet(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
 function lsSet(key, value) { try { localStorage.setItem(key, value); } catch (e) { /* ignora */ } }
@@ -2323,6 +2350,10 @@ function loadSettings() {
   state.theme = lsGet(THEME_KEY) === 'oled' ? 'oled' : 'dark';
   state.nsfw = lsGet(NSFW_KEY) === '1';
   state.privacy = lsGet(PRIVACY_KEY) === '1';
+  try {
+    const disabled = JSON.parse(lsGet(DISABLED_SERVERS_KEY));
+    state.disabledServers = Array.isArray(disabled) ? disabled.filter((x) => typeof x === 'string') : [];
+  } catch (e) { state.disabledServers = []; }
   const saved = lsGet(DEFAULT_SERVER_KEY);
   if (saved) state.preferredServer = saved; // validado em applyServersConfig()
   applyTheme();
@@ -2341,11 +2372,21 @@ function applyPrivacy() {
 
 function renderSettings() {
   document.querySelectorAll('[data-theme-set]').forEach((b) => b.classList.toggle('active', b.dataset.themeSet === state.theme));
-  const sel = $('set-server');
-  sel.innerHTML = Object.entries(SERVERS)
-    .filter(([, srv]) => srv.type === 'embed')
-    .map(([key, srv]) => `<option value="${key}">${escapeHtml(srv.label)}</option>`).join('');
-  sel.value = state.preferredServer;
+  document.querySelectorAll('[data-device-set]').forEach((b) => b.classList.toggle('active', b.dataset.deviceSet === state.device));
+  $('set-providers').innerHTML = ALL_SERVERS.map((srv) => {
+    const on = !state.disabledServers.includes(srv.id);
+    return `
+      <div class="prov-row">
+        <label class="prov-def">
+          <input type="radio" name="set-default" value="${srv.id}" ${srv.id === state.preferredServer ? 'checked' : ''} ${on ? '' : 'disabled'}>
+          <span>${escapeHtml(srv.label)}</span>
+        </label>
+        <label class="set-switch">
+          <input type="checkbox" data-prov="${srv.id}" ${on ? 'checked' : ''}>
+          <span class="slider" aria-hidden="true"></span>
+        </label>
+      </div>`;
+  }).join('');
   $('set-nsfw').checked = state.nsfw;
   $('set-privacy').checked = state.privacy;
 }
@@ -2360,13 +2401,30 @@ function setTheme(value) {
   renderSettings();
 }
 
-function onDefaultServerChange(e) {
-  const key = e.target.value;
+function setDefaultServer(key) {
   if (!SERVERS[key]) return;
   state.preferredServer = key;
   lsSet(DEFAULT_SERVER_KEY, key);
   buildServerOptions();
   showToast(t('saved'));
+}
+
+/* Gerenciador de provedores: o botão de rádio escolhe o padrão; o interruptor liga/desliga o provedor */
+function onProvidersChange(e) {
+  const radio = e.target.closest('input[type="radio"]');
+  if (radio) { setDefaultServer(radio.value); return; }
+  const toggle = e.target.closest('[data-prov]');
+  if (!toggle) return;
+  const id = toggle.dataset.prov;
+  const enabled = ALL_SERVERS.filter((srv) => !state.disabledServers.includes(srv.id)).length;
+  if (!toggle.checked && enabled <= 1) { toggle.checked = true; showToast(t('provMin')); return; } // sempre sobra um
+  state.disabledServers = toggle.checked
+    ? state.disabledServers.filter((x) => x !== id)
+    : [...state.disabledServers, id];
+  lsSet(DISABLED_SERVERS_KEY, JSON.stringify(state.disabledServers));
+  applyServersConfig(state.cfg);
+  lsSet(DEFAULT_SERVER_KEY, state.preferredServer);
+  buildServerOptions();
 }
 
 function onNsfwChange(e) {
@@ -2535,11 +2593,29 @@ function neighborCard(card, key) {
 
 function onShortcut(e) {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
-  const active = document.activeElement;
-  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName) || active.isContentEditable;
+  const active = document.activeElement || document.body;
+  const tag = active.tagName;
+  const textual = (tag === 'INPUT' && !/^(checkbox|radio|button|submit)$/.test(active.type)) || tag === 'TEXTAREA' || active.isContentEditable;
+  if (textual) return;
+
+  const tv = state.device === 'tv';
+  const isSelect = tag === 'SELECT';
   const inPlyr = Boolean(active.closest && active.closest('.plyr')); // o Plyr já trata as próprias teclas
   const playerOpen = !$('player-modal').classList.contains('hidden');
-  if (typing) return;
+  const arrows = ['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'];
+
+  // TV / console: setas movem o foco entre botões, cards e links; Backspace volta (igual ao Esc)
+  if (tv && e.key === 'Backspace') {
+    e.preventDefault();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    return;
+  }
+  if (tv && arrows.includes(e.key)) {
+    if (isSelect && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) return; // muda o valor do select
+    if (spatialMove(e.key)) e.preventDefault();
+    return;
+  }
+  if (isSelect) return;
 
   if ((e.key === 'f' || e.key === 'F') && playerOpen && !inPlyr) {
     e.preventDefault();
@@ -2551,7 +2627,7 @@ function onShortcut(e) {
     if (e.key === 'ArrowRight') nextEpisode(); else prevEpisode();
     return;
   }
-  if (['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key) && active.closest) {
+  if (arrows.includes(e.key) && active.closest) {
     const card = active.closest('.anime-card, .cat-card');
     const target = card && neighborCard(card, e.key);
     if (target) {
@@ -2560,6 +2636,106 @@ function onShortcut(e) {
       target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }
   }
+}
+
+/* =====================================================================
+   Dispositivo (onboarding + densidade do layout + comportamento de foco)
+   ===================================================================== */
+const DEVICE_KEY = 'loft_device_mode';
+const DEVICES = ['pc', 'tv', 'mobile'];
+
+/* Sugestão automática (destacada como "Recomendado" no onboarding) */
+function detectDevice() {
+  const ua = navigator.userAgent || '';
+  if (/SMART-TV|SmartTV|Tizen|Web0S|WebOS|NetCast|HbbTV|PlayStation|Xbox|Nintendo|AFTB|AFTS|AFTM|CrKey|BRAVIA|Roku|VIDAA/i.test(ua)) return 'tv';
+  const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua) || (coarse && Math.min(screen.width, screen.height) < 900)) return 'mobile';
+  return 'pc';
+}
+
+function applyDevice(mode) {
+  state.device = mode;
+  document.documentElement.dataset.device = mode; // o CSS adapta cards, carrosséis e foco
+}
+
+function setDevice(mode) {
+  if (!DEVICES.includes(mode)) mode = 'pc';
+  lsSet(DEVICE_KEY, mode);
+  applyDevice(mode);
+  renderSettings();
+}
+
+function showOnboarding(recommended) {
+  document.querySelectorAll('.ob-option').forEach((b) => b.classList.toggle('rec', b.dataset.device === recommended));
+  $('onboarding').classList.remove('hidden');
+  document.body.classList.add('modal-open');
+  const first = document.querySelector(`.ob-option[data-device="${recommended}"]`);
+  if (first) first.focus(); // quem usa controle remoto já começa com o foco na opção recomendada
+}
+
+function chooseDevice(mode) {
+  setDevice(mode);
+  $('onboarding').classList.add('hidden');
+  syncBodyLock();
+}
+
+/* Primeira visita (sem loft_device_mode salvo): mostra o onboarding; senão aplica a preferência */
+function initDevice() {
+  const saved = lsGet(DEVICE_KEY);
+  if (DEVICES.includes(saved)) { applyDevice(saved); return; }
+  const recommended = detectDevice();
+  applyDevice(recommended);
+  showOnboarding(recommended);
+}
+
+/* =====================================================================
+   Navegação espacial por foco (TV / console) e altura da navbar
+   ===================================================================== */
+function focusables() {
+  const layers = ['onboarding', 'maintenance', 'settings-modal', 'trailer-modal', 'player-modal', 'anime-modal']
+    .map((id) => $(id)).filter((el) => el && !el.classList.contains('hidden'));
+  const root = layers[0] || document; // o foco fica preso na camada mais alta aberta
+  return [...root.querySelectorAll('a[href], button:not([disabled]), select:not(.sr-only), input:not([disabled]):not(.sr-only), textarea, [tabindex="0"]')]
+    .filter((el) => el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden');
+}
+
+function spatialMove(key) {
+  const list = focusables();
+  if (!list.length) return false;
+  const cur = document.activeElement;
+  if (!cur || cur === document.body || !list.includes(cur)) { list[0].focus(); return true; }
+
+  const r = cur.getBoundingClientRect();
+  const cx = r.left + r.width / 2;
+  const cy = r.top + r.height / 2;
+  const horizontal = key === 'ArrowRight' || key === 'ArrowLeft';
+  let best = null;
+  let bestScore = Infinity;
+  list.forEach((el) => {
+    if (el === cur) return;
+    const b = el.getBoundingClientRect();
+    const dx = b.left + b.width / 2 - cx;
+    const dy = b.top + b.height / 2 - cy;
+    const inDirection = key === 'ArrowRight' ? dx > 4 : key === 'ArrowLeft' ? dx < -4 : key === 'ArrowDown' ? dy > 4 : dy < -4;
+    if (!inDirection) return;
+    const score = (horizontal ? Math.abs(dx) : Math.abs(dy)) + (horizontal ? Math.abs(dy) : Math.abs(dx)) * 2.5;
+    if (score < bestScore) { bestScore = score; best = el; }
+  });
+  if (!best) return false;
+  best.focus({ preventScroll: true });
+  best.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+  return true;
+}
+
+/* Mede a navbar fixa e reserva esse espaço no <main>, em qualquer tela (nunca encavala no banner) */
+function initNavOffset() {
+  const nav = $('navbar');
+  const apply = () => document.documentElement.style.setProperty('--nav-h', `${nav.offsetHeight}px`);
+  apply();
+  if ('ResizeObserver' in window) new ResizeObserver(apply).observe(nav);
+  window.addEventListener('resize', apply);
+  window.addEventListener('orientationchange', apply);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(apply);
 }
 
 /* Preenche o seletor (e os botões) de servidores a partir do objeto SERVERS */
@@ -2575,6 +2751,8 @@ function buildServerOptions() {
 
 async function init() {
   loadSettings();
+  initDevice();
+  initNavOffset();
   initResilience();
   bindEvents();
   initUi();
