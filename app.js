@@ -425,4 +425,568 @@ async function resumeContinue(id) {
 }
 
 const SEARCH_QUERY = `query($q: String, $adult: Boolean) {
-  Page(perPage: 40) { media(type: AN
+  Page(perPage: 40) { media(type: ANIME, search: $q, sort: SEARCH_MATCH, isAdult: $adult) { ${MEDIA_FIELDS} } }
+}`;
+async function runSearch(q) {
+  q = (q||'').trim();
+  $('search-h').textContent = t('searchFor', { q });
+  const input = $('search-input'); if (document.activeElement !== input) input.value = q;
+  const grid = $('search-grid');
+  if (!q) { grid.innerHTML = emptyHTML('ph-magnifying-glass', t('searchPh')); return; }
+  const seq = ++state.searchSeq;
+  grid.innerHTML = skeletonCards(12);
+  try {
+    const data = await gql(SEARCH_QUERY, { q, adult: adultVar() });
+    if (seq !== state.searchSeq) return;
+    const list = remember(data.Page.media);
+    grid.innerHTML = list.length ? list.map(m => cardHTML(m)).join('') : emptyHTML('ph-ghost', t('searchEmpty',{q}));
+  } catch (e) { if (seq === state.searchSeq) grid.innerHTML = errorHTML(()=>runSearch(q)); }
+}
+const onSearchInput = debounce((q) => {
+  q = q.trim(); if (q.length < 2) return;
+  const hash = '#/search?q=' + encodeURIComponent(q);
+  if (state.view === 'search') { history.replaceState(history.state, '', hash); route(); }
+  else location.hash = hash;
+}, 420);
+
+const BROWSE_QUERY = `query($page: Int, $season: MediaSeason, $seasonYear: Int, $from: FuzzyDateInt, $to: FuzzyDateInt, $format: MediaFormat, $genre: String, $sort: [MediaSort], $adult: Boolean) {
+  Page(page: $page, perPage: 30) {
+    pageInfo { hasNextPage total }
+    media(type: ANIME, season: $season, seasonYear: $seasonYear, startDate_greater: $from, startDate_lesser: $to, format: $format, genre: $genre, sort: $sort, isAdult: $adult) { ${MEDIA_FIELDS} }
+  }
+}`;
+
+function buildFilterSelects() {
+  const yearSel = $('f-year'); if (!yearSel) return;
+  const keepYear = yearSel.value;
+  const now = new Date().getFullYear() + 1;
+  let html = `<option value="">${esc(t('any'))}</option>`;
+  for (let y = now; y >= 1960; y--) html += `<option value="${y}">${y}</option>`;
+  yearSel.innerHTML = html; yearSel.value = keepYear;
+
+  const genreSel = $('f-genre'); const keepGenre = genreSel.value;
+  const genres = state.genres.filter(g => state.nsfw || g !== 'Hentai');
+  genreSel.innerHTML = `<option value="">${esc(t('any'))}</option>` + genres.map(g => `<option value="${esc(g)}">${esc(g)}</option>`).join('');
+  genreSel.value = genres.includes(keepGenre) ? keepGenre : '';
+
+  $('genre-chips').innerHTML = QUICK_GENRES.map(g => `<button type="button" class="chip" data-genre="${esc(g)}" aria-pressed="${genreSel.value===g}">${esc(g)}</button>`).join('');
+}
+async function loadGenres() {
+  try {
+    const d = await gql('{ GenreCollection }');
+    if (Array.isArray(d.GenreCollection) && d.GenreCollection.length) { state.genres = d.GenreCollection; buildFilterSelects(); }
+  } catch (e) {}
+}
+/* ✅ BUG 2 CORRIGIDO: FuzzyDateInt válido */
+function browseVars(page) {
+  const yearRaw = $('f-year').value;
+  const year = yearRaw ? Number(yearRaw) : null;
+  const season = $('f-season').value || null;
+  const useSeasonYear = season && year;
+  const useDateRange  = !season && year;
+  return {
+    page, season,
+    seasonYear: useSeasonYear ? year : null,
+    from: useDateRange ? year * 10000 + 101 : null,
+    to:   useDateRange ? (year + 1) * 10000 + 101 : null,
+    format: $('f-format').value || null,
+    genre: $('f-genre').value || null,
+    sort: [$('f-sort').value || 'POPULARITY_DESC'],
+    adult: adultVar()
+  };
+}
+async function loadBrowse(reset) {
+  const b = state.browse;
+  if (reset) { b.page = 1; b.seq++; }
+  const seq = b.seq; const grid = $('browse-grid'); const more = $('browse-more');
+  if (reset) grid.innerHTML = skeletonCards(18);
+  b.loading = true; more.disabled = true;
+  try {
+    const data = await gql(BROWSE_QUERY, browseVars(b.page));
+    if (seq !== b.seq) { b.loading = false; return; }
+    const pageInfo = data.Page.pageInfo;
+    const list = remember(data.Page.media);
+    b.hasNext = pageInfo.hasNextPage;
+    if (reset) grid.innerHTML = list.length ? list.map(m => cardHTML(m)).join('') : emptyHTML('ph-magnifying-glass', t('noResults'));
+    else if (list.length) grid.insertAdjacentHTML('beforeend', list.map(m => cardHTML(m)).join(''));
+    more.hidden = !b.hasNext;
+    const count = $('browse-count');
+    if (count) count.textContent = t('titles', { n: pageInfo.total || list.length });
+  } catch (e) {
+    if (reset && seq === b.seq) grid.innerHTML = errorHTML(()=>loadBrowse(true));
+    else toast(t('loadErr'), { type:'error' });
+  } finally { b.loading = false; more.disabled = false; }
+}
+async function getMedia(id) {
+  if (state.media.has(id) && state.media.get(id).description != null) return state.media.get(id);
+  const data = await gql(`query($id: Int) { Media(id: $id) { ${MEDIA_FIELDS} } }`, { id });
+  if (!data || !data.Media) throw new Error('not found');
+  remember([data.Media]);
+  return data.Media;
+}
+
+async function openDetail(id) {
+  const existing = state.media.get(id);
+  openLayer('detail');
+  if (existing) renderDetail(existing);
+  try { const full = await getMedia(id); if (isOpen('detail')) renderDetail(full); }
+  catch (e) { if (isOpen('detail') && !existing) { $('d-title').textContent = t('loadErr'); } }
+}
+function renderDetail(m) {
+  state.detail = m;
+  const title = titleOf(m);
+  $('d-banner').style.backgroundImage = m.bannerImage ? `url("${m.bannerImage}")` : '';
+  $('d-cover').src = coverOf(m); $('d-cover').alt = title;
+  $('d-title').textContent = title;
+  $('d-native').textContent = (m.title && m.title.native) || '';
+  const badges = [];
+  if (m.averageScore) badges.push(`<span class="badge badge-score"><i class="ph-fill ph-star"></i>${(m.averageScore/10).toFixed(1)}</span>`);
+  if (m.isAdult) badges.push('<span class="badge badge-adult">18+</span>');
+  if (m.status) badges.push(`<span class="badge">${esc(t('st_' + m.status) || m.status)}</span>`);
+  $('d-badges').innerHTML = badges.join('');
+  const meta = [];
+  if (m.format) meta.push(`<span><i class="ph ph-film-strip"></i>${esc(fmtLabel(m.format))}</span>`);
+  if (m.seasonYear) meta.push(`<span><i class="ph ph-calendar"></i>${m.seasonYear}</span>`);
+  if (m.episodes) meta.push(`<span><i class="ph ph-list-numbers"></i>${esc(t('eps',{n:m.episodes}))}</span>`);
+  if (m.duration) meta.push(`<span><i class="ph ph-clock"></i>${esc(t('min',{n:m.duration}))}</span>`);
+  $('d-meta').innerHTML = meta.join('');
+  const fav = isFav(m.id);
+  $('d-fav').setAttribute('aria-pressed', String(fav));
+  $('d-fav').querySelector('span').textContent = t(fav ? 'favRemove' : 'favAdd');
+  const total = totalEpisodes(m); const cont = getContinue()[m.id];
+  const playBtn = $('d-play');
+  playBtn.querySelector('span').textContent = cont ? t('resumeEp',{n:cont.ep}) : (total > 0 ? t('playEp',{n:1}) : t('watchNow'));
+  playBtn.disabled = total === 0;
+  $('d-trailer').style.display = m.trailer && m.trailer.site === 'youtube' ? '' : 'none';
+  const desc = stripHtml(m.description || '');
+  const descEl = $('d-desc');
+  descEl.textContent = desc;
+  descEl.classList.toggle('collapsed', desc.length > 320);
+  descEl.onclick = () => descEl.classList.toggle('collapsed');
+  $('d-genres').innerHTML = (m.genres||[]).map(g => `<button type="button" class="chip" data-genre="${esc(g)}">${esc(g)}</button>`).join('');
+  renderEpisodes(m); renderRelated(m); renderReviews(m); paintAlStatus(m);
+}
+function renderEpisodes(m) {
+  const total = totalEpisodes(m); const box = $('d-episodes'); const note = $('d-ep-note');
+  const watched = new Set(getWatched(m.id)); const cont = getContinue()[m.id];
+  if (total === 0) { box.innerHTML = emptyHTML('ph-calendar-blank', t('noEpisodes')); note.textContent = ''; return; }
+  const current = cont ? cont.ep : 0;
+  box.innerHTML = Array.from({length: total}, (_,i) => {
+    const n = i + 1; const cls = ['ep'];
+    if (watched.has(n)) cls.push('watched');
+    if (n === current) cls.push('current');
+    if (m.nextAiringEpisode && n >= m.nextAiringEpisode.episode) cls.push('soon');
+    return `<button type="button" class="${cls.join(' ')}" data-play-ep="${m.id}" data-ep="${n}">${n}</button>`;
+  }).join('');
+  note.textContent = m.nextAiringEpisode ? t('nextAiring', { n: m.nextAiringEpisode.episode, t: fmtCountdown(m.nextAiringEpisode.timeUntilAiring) }) : (t('watched') + ': ' + watched.size + '/' + total);
+}
+function renderRelated(m) {
+  const wrap = $('d-rel-wrap'); const rail = $('d-related');
+  const edges = (m.relations && m.relations.edges) || [];
+  const related = edges.filter(e => e.node && e.node.type === 'ANIME' && e.node.id !== m.id).map(e => e.node).slice(0, 12);
+  if (!related.length) { wrap.hidden = true; return; }
+  wrap.hidden = false; remember(related);
+  rail.innerHTML = related.map(x => cardHTML(x)).join('');
+}
+
+function reviewsKey(id) { return K.reviews + id; }
+const getReviews = id => lsJSON(reviewsKey(id), []);
+function saveReview(id, r) { const all = getReviews(id); all.unshift(r); lsSetJSON(reviewsKey(id), all); }
+function delReview(id, ts) { const all = getReviews(id).filter(r => r.ts !== ts); lsSetJSON(reviewsKey(id), all); }
+function renderReviews(m) {
+  const id = m.id; const list = getReviews(id); const wrap = $('review-summary'); const ul = $('review-list');
+  if (!list.length) { wrap.innerHTML = ''; ul.innerHTML = `<li class="review"><p class="muted">${esc(t('noReviews'))}</p></li>`; }
+  else {
+    const avg = list.reduce((s,r)=>s+r.stars,0) / list.length;
+    wrap.innerHTML = `<strong>${avg.toFixed(1)}</strong><span class="stars">${'★'.repeat(Math.round(avg))}${'☆'.repeat(5-Math.round(avg))}</span><span>${esc(t('avgOf',{n:list.length}))}</span>`;
+    ul.innerHTML = list.map(r => `<li class="review"><div class="review-top"><span class="stars">${'★'.repeat(r.stars)}${'☆'.repeat(5-r.stars)}</span><button type="button" class="review-del" data-del-review="${r.ts}" data-review-id="${id}">${esc(t('del'))}</button></div>${r.text ? `<p>${esc(r.text)}</p>` : ''}</li>`).join('');
+  }
+  const stars = document.querySelector('.stars-input');
+  if (stars) {
+    if (!stars.children.length) stars.innerHTML = [1,2,3,4,5].map(n => `<button type="button" class="star-btn" data-star="${n}" aria-label="${n} star${n>1?'s':''}">★</button>`).join('');
+    qsa('.star-btn', stars).forEach(b => b.classList.toggle('on', Number(b.dataset.star) <= state.starDraft));
+  }
+}
+function paintAlStatus(m) {
+  const wrap = $('d-al-wrap'); if (!state.token) { wrap.hidden = true; return; }
+  wrap.hidden = false;
+  const sel = $('d-al-status');
+  if (!sel.children.length) {
+    sel.innerHTML = ['NONE','CURRENT','PLANNING','COMPLETED','PAUSED','DROPPED','REPEATING'].map(k => `<option value="${k}">${esc(t('al_'+k))}</option>`).join('');
+    sel.addEventListener('change', onAlStatusChange);
+  }
+  sel.dataset.media = String(m.id);
+  gql(`query($id: Int) { Media(id: $id) { mediaListEntry { status } } }`, { id:m.id }, { auth:true })
+    .then(d => { sel.value = (d.Media.mediaListEntry && d.Media.mediaListEntry.status) || 'NONE'; })
+    .catch(()=>{ sel.value = 'NONE'; });
+}
+async function onAlStatusChange(e) {
+  const sel = e.target; const mediaId = Number(sel.dataset.media); const status = sel.value;
+  try {
+    if (status === 'NONE') await gql(`mutation($id: Int) { DeleteMediaListEntry(id: $id) { deleted } }`, { id:mediaId }, { auth:true, cache:false });
+    else await gql(`mutation($id: Int, $s: MediaListStatus) { SaveMediaListEntry(mediaId:$id, status:$s) { id status } }`, { id:mediaId, s:status }, { auth:true, cache:false });
+    toast(t('synced'), { type:'ok' });
+  } catch (e) { toast(t('syncFail'), { type:'error' }); }
+}
+
+/* ✅ BUG 1 CORRIGIDO: monta URL real; retorna null se falta dado */
+function buildServerURL(server, media, ep, audio) {
+  if (!server || !server.url) return null;
+  let url = server.url;
+  const anilistId = media && media.id != null ? String(media.id) : '';
+  const malId = media && media.idMal != null ? String(media.idMal) : '';
+  const epStr = String(ep || 1);
+  const audioStr = audio === 'dub' ? 'dub' : 'sub';
+  if (url.includes('{malId}') && !malId) return null;
+  if (url.includes('{anilistId}') && !anilistId) return null;
+  url = url.replace(/\{malId\}/g, malId).replace(/\{anilistId\}/g, anilistId)
+           .replace(/\{ep\}/g, epStr).replace(/\{audio\}/g, audioStr)
+           .replace(/\{season\}/g, String((media && media.seasonYear) || ''));
+  if (/\{[a-zA-Z]+\}/.test(url)) return null;
+  return url;
+}
+
+function enabledServers() {
+  const cfg = state.config.servers || [];
+  const enabled = state.prefs.enabled || {};
+  return cfg.filter(s => enabled[s.id] !== false && s.enabled !== false);
+}
+
+/* Ordem de prioridade: MegaPlay → Vidsrc.cc → resto */
+function pickPlayableServer(media, ep, preferredId) {
+  const list = enabledServers(); if (!list.length) return null;
+  const audio = state.audio || 'sub';
+  const order = [];
+  if (preferredId) { const p = list.find(s => s.id === preferredId); if (p) order.push(p); }
+  ['megaplay','vidsrccc'].forEach(id => { const s = list.find(x => x.id === id); if (s && !order.includes(s)) order.push(s); });
+  list.forEach(s => { if (!order.includes(s)) order.push(s); });
+  for (const s of order) {
+    const url = buildServerURL(s, media, ep, audio);
+    if (url) return { server: s, url };
+  }
+  return null;
+}
+
+async function openPlayer(media, ep = 1) {
+  if (!media) return;
+  let full = media;
+  if (full.description == null || !full.relations) {
+    try { full = await getMedia(media.id); } catch (e) {}
+  }
+  const total = totalEpisodes(full);
+  if (total === 0) { toast(t('noEpisodes')); return; }
+  ep = Math.max(1, Math.min(ep, total));
+  if (!enabledServers().length) { toast(t('noServer'), { type:'error' }); return; }
+  state.player = { media: full, ep, audio: state.audio || 'sub', serverId: null, url: null };
+  openLayer('player');
+  saveContinue(full, ep);
+  paintPlayerChrome();
+  loadPlayerSource();
+}
+
+function paintPlayerChrome() {
+  const p = state.player; if (!p) return;
+  const m = p.media;
+  $('p-title').textContent = titleOf(m);
+  $('p-sub').textContent = `${t('episode')} ${p.ep}${m.episodes?` / ${m.episodes}`:''}`;
+  const sel = $('p-episode'); const total = totalEpisodes(m);
+  sel.innerHTML = Array.from({length: total}, (_,i) => { const n = i+1; return `<option value="${n}"${n===p.ep?' selected':''}>${t('ep')} ${n}</option>`; }).join('');
+  qsa('#p-audio [data-audio]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.audio === p.audio)));
+  $('p-prev').disabled = p.ep <= 1;
+  $('p-next').disabled = p.ep >= total;
+  const box = $('p-servers'); const list = enabledServers();
+  box.innerHTML = list.map(s => {
+    const ok = !!buildServerURL(s, m, p.ep, p.audio);
+    const on = s.id === p.serverId;
+    return `<button type="button" class="srv" role="radio" aria-checked="${on}" data-server="${s.id}"${ok?'':' aria-disabled="true"'}>${esc(s.label)}</button>`;
+  }).join('');
+}
+
+function loadPlayerSource() {
+  const p = state.player; if (!p) return;
+  const chosen = pickPlayableServer(p.media, p.ep, p.serverId);
+  if (!chosen) {
+    const anyEnabled = enabledServers();
+    if (!anyEnabled.length) toast(t('noServer'), { type:'error' });
+    else toast(t('serverSkip', { s: anyEnabled[0].label }), { type:'error' });
+    $('stage-loading').classList.remove('gone');
+    return;
+  }
+  p.serverId = chosen.server.id; p.url = chosen.url;
+  const frame = $('embed-player'); const loading = $('stage-loading'); const hint = $('stage-hint');
+  loading.classList.remove('gone'); hint.hidden = true;
+  frame.src = 'about:blank';
+  requestAnimationFrame(() => { frame.src = p.url; });
+  frame.onload = () => { loading.classList.add('gone'); };
+  clearTimeout(loadPlayerSource._t);
+  loadPlayerSource._t = setTimeout(() => {
+    if (!loading.classList.contains('gone')) { loading.classList.add('gone'); hint.hidden = false; }
+  }, EMBED_TIMEOUT_MS);
+  $('p-direct').href = p.url;
+  markWatched(p.media.id, p.ep);
+  saveContinue(p.media, p.ep);
+  qsa('.srv').forEach(b => b.setAttribute('aria-checked', String(b.dataset.server === p.serverId)));
+}
+function switchServer(serverId) { const p = state.player; if (!p) return; p.serverId = serverId; loadPlayerSource(); paintPlayerChrome(); }
+function nextEp() { const p = state.player; if (!p) return; const total = totalEpisodes(p.media); if (p.ep >= total) { toast(t('lastEp')); return; } p.ep += 1; saveContinue(p.media, p.ep); paintPlayerChrome(); loadPlayerSource(); }
+function prevEp() { const p = state.player; if (!p) return; if (p.ep <= 1) return; p.ep -= 1; saveContinue(p.media, p.ep); paintPlayerChrome(); loadPlayerSource(); }
+function setAudio(audio) { const p = state.player; if (!p) return; if (p.audio === audio) return; p.audio = audio; lsSet(K.audio, audio); paintPlayerChrome(); loadPlayerSource(); }
+
+async function loadServersConfig() {
+  try {
+    const res = await fetch(SERVERS_URL, { cache: 'no-store' });
+    if (res.ok) {
+      const cfg = await res.json();
+      if (cfg && Array.isArray(cfg.servers) && cfg.servers.length) state.config = cfg;
+    }
+  } catch (e) { /* servers.json opcional */ }
+  if (!state.config || !state.config.servers) state.config = DEFAULT_SERVERS;
+}
+
+function paintSettings() {
+  qsa('#s-device [data-device]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.device === state.device)));
+  qsa('#s-theme [data-theme-opt]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.themeOpt === state.theme)));
+  const lang = $('s-lang'); if (lang) lang.value = state.lang;
+  const nsfw = $('s-nsfw'); if (nsfw) nsfw.checked = state.nsfw;
+  const priv = $('s-privacy'); if (priv) priv.checked = state.privacy;
+  const defSel = $('s-default-server');
+  if (defSel) { defSel.innerHTML = `<option value="">—</option>` + (state.config.servers||[]).map(s => `<option value="${s.id}">${esc(s.label)}</option>`).join(''); defSel.value = state.prefs.default || ''; }
+  const list = $('s-servers');
+  if (list) {
+    const enabled = state.prefs.enabled || {};
+    list.innerHTML = (state.config.servers||[]).map(s => {
+      const on = enabled[s.id] !== false && s.enabled !== false;
+      return `<li class="toggle-row"><div><span class="body-5">${esc(s.label)}</span><p class="caption-5 muted">${esc(s.url)}</p></div><input type="checkbox" class="switch" role="switch" data-toggle-server="${esc(s.id)}"${on?' checked':''}></li>`;
+    }).join('');
+  }
+  const hint = $('s-al-hint'); if (hint) hint.textContent = t('alHint');
+  const redirect = $('s-redirect'); if (redirect) redirect.textContent = location.origin + location.pathname + '#/anilist-cb';
+  const cid = $('s-client-id'); if (cid) cid.value = CONFIG.anilistClientId || lsGet(K.clientId, '');
+  const loginBtn = $('s-al-login'), logoutBtn = $('s-al-logout');
+  if (loginBtn && logoutBtn) { loginBtn.hidden = !!state.token; logoutBtn.hidden = !state.token; }
+  const version = $('s-version'); if (version) version.textContent = t('version', { v: APP_VERSION });
+}
+
+async function login() {
+  const cid = (CONFIG.anilistClientId || $('s-client-id').value || '').trim();
+  if (!cid) { toast(t('alNeedId')); return; }
+  lsSet(K.clientId, cid);
+  const redirect = location.origin + location.pathname + '#/anilist-cb';
+  location.href = `https://anilist.co/api/v2/oauth/authorize?client_id=${encodeURIComponent(cid)}&response_type=token&redirect_uri=${encodeURIComponent(redirect)}`;
+}
+function logout(silent = false) {
+  state.token = null; state.viewer = null;
+  lsDel(K.token);
+  if (!silent) toast(t('logout'), { type:'ok' });
+  paintSettings(); renderAuth();
+}
+function handleOAuthCallback() {
+  const h = location.hash.replace(/^#\/?/, '');
+  if (!h.startsWith('anilist-cb') && !h.startsWith('access_token')) return false;
+  const q = h.includes('?') ? h.split('?')[1] : h;
+  const p = new URLSearchParams(q);
+  const tok = p.get('access_token');
+  if (tok) { state.token = tok; lsSet(K.token, tok); toast(t('alSignedIn', { n: '' }), { type:'ok' }); history.replaceState(null, '', location.pathname + '#/home'); return true; }
+  return false;
+}
+function renderAuth() {
+  const avatar = $('account-avatar'); const label = $('account-label');
+  if (!avatar || !label) return;
+  if (state.token) {
+    label.textContent = t('profile');
+    gql('{ Viewer { name avatar { large } } }', {}, { auth:true }).then(d => {
+      if (!d || !d.Viewer) return;
+      state.viewer = d.Viewer;
+      label.textContent = d.Viewer.name;
+      const av = d.Viewer.avatar && d.Viewer.avatar.large;
+      if (av) { avatar.style.backgroundImage = `url("${av}")`; avatar.innerHTML = ''; }
+    }).catch(()=>{});
+  } else { label.textContent = t('login'); avatar.style.backgroundImage = ''; avatar.innerHTML = '<i class="ph ph-user"></i>'; }
+}
+
+function renderList() {
+  const list = continueList();
+  const cont = $('list-continue');
+  cont.innerHTML = list.length ? list.map(c => cwCardHTML(c)).join('') : `<p class="muted">${esc(t('emptyContinue'))}</p>`;
+  const favs = getFavs(); const favsBox = $('list-favs');
+  favsBox.innerHTML = favs.length ? favs.map(f => cardHTML(f)).join('') : emptyHTML('ph-heart', t('emptyFavs'));
+  const alSection = $('list-anilist');
+  if (!state.token) { alSection.hidden = true; return; }
+  alSection.hidden = false;
+  const tabs = $('al-filter');
+  if (!tabs.children.length) tabs.innerHTML = ['CURRENT','PLANNING','COMPLETED','PAUSED','DROPPED','REPEATING'].map(k => `<button type="button" role="tab" data-al-filter="${k}">${esc(t('al_'+k))}</button>`).join('');
+  qsa('[data-al-filter]', tabs).forEach(b => b.setAttribute('aria-checked', String(b.dataset.alFilter === state.alFilter)));
+  loadAniListList();
+}
+async function loadAniListList() {
+  const box = $('list-al'); box.innerHTML = skeletonCards(12);
+  const userName = state.viewer && state.viewer.name;
+  if (!userName) {
+    try { const v = await gql('{ Viewer { name } }', {}, { auth:true }); state.viewer = state.viewer || {}; state.viewer.name = v.Viewer.name; }
+    catch (e) { box.innerHTML = errorHTML(loadAniListList); return; }
+  }
+  try {
+    const d = await gql(`query($name:String,$status:MediaListStatus){ Page(perPage:30){ mediaList(userName:$name,status:$status,type:ANIME,sort:UPDATED_TIME_DESC){ media { ${MEDIA_FIELDS} } } } }`, { name: state.viewer.name, status: state.alFilter }, { auth:true });
+    const list = d.Page.mediaList.map(x => x.media).filter(Boolean);
+    remember(list);
+    box.innerHTML = list.length ? list.map(m => cardHTML(m)).join('') : emptyHTML('ph-cloud-slash', t('noResults'));
+  } catch (e) { box.innerHTML = errorHTML(loadAniListList); }
+}
+
+function renderTagline() {
+  const el = $('tagline-text'); if (!el) return;
+  const raw = t('tagline') || '';
+  el.innerHTML = raw.split('|').map(line => line.split(/\s+/).map(w => { const isLoft = /loft/i.test(w); return `<span class="w${isLoft?' loft':''}">${esc(w)}</span>`; }).join(' ')).join('<br>');
+}
+function mascotSay(force = false) {
+  const el = $('mascot-say'); if (!el) return;
+  const tips = [t('mascotHi'), t('tip1'), t('tip2'), t('tip3'), t('tip4')];
+  const current = lsGet('loft_mascot_idx', '0');
+  let idx = force ? (Number(current) + 1) % tips.length : Number(current) % tips.length;
+  lsSet('loft_mascot_idx', String(idx));
+  el.textContent = tips[idx];
+}
+function initMascot() {
+  const box = $('mascot'); const avatar = $('mascot-avatar');
+  if (lsGet(K.mascot) === '1') box.classList.add('min');
+  avatar.setAttribute('aria-expanded', String(!box.classList.contains('min')));
+  $('mascot-min').addEventListener('click', () => { box.classList.add('min'); lsSet(K.mascot, '1'); avatar.setAttribute('aria-expanded', 'false'); });
+  avatar.addEventListener('click', () => { const min = box.classList.toggle('min'); lsSet(K.mascot, min ? '1' : '0'); avatar.setAttribute('aria-expanded', String(!min)); });
+  $('mascot-random').addEventListener('click', async () => {
+    try { const d = await gql('{ Page(perPage: 1) { media(type: ANIME, sort: RANDOM, isAdult: false) { id } } }'); const id = d.Page.media[0] && d.Page.media[0].id; if (id) openDetail(id); } catch (e) {}
+  });
+  mascotSay(true);
+}
+
+function applyDevice(device) { state.device = device; lsSet(K.device, device); document.documentElement.dataset.device = device; paintSettings(); }
+function applyTheme(theme) { state.theme = theme; lsSet(K.theme, theme); document.documentElement.dataset.theme = theme; paintSettings(); }
+function maybeOnboard() {
+  const onboarded = lsGet(K.onboarded) === '1';
+  const hasDevice = !!lsGet(K.device);
+  if (onboarded && hasDevice) { applyDevice(state.device || 'pc'); return; }
+  $('onboarding').hidden = false;
+  qsa('#onboarding [data-pick-device]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const dev = btn.dataset.pickDevice;
+      applyDevice(dev); lsSet(K.onboarded, '1'); $('onboarding').hidden = true;
+      if (dev === 'tv') { const first = document.querySelector('.hero-slide.on .btn-primary'); if (first) first.focus(); }
+    }, { once: true });
+  });
+}
+
+function initKeyboard() {
+  document.addEventListener('keydown', (e) => {
+    const tag = (e.target && e.target.tagName || '').toLowerCase();
+    const typing = tag === 'input' || tag === 'textarea' || tag === 'select';
+    if (e.key === 'Escape') { if (closeTop()) { e.preventDefault(); return; } }
+    if (typing) return;
+    if (e.key === '/') { e.preventDefault(); const inp = $('search-input'); if (inp) { inp.focus(); inp.select(); } }
+    if ((e.key === 'f' || e.key === 'F') && isOpen('player')) { e.preventDefault(); toggleFullscreen(); }
+    if ((e.key === 'n' || e.key === 'N') && isOpen('player')) { e.preventDefault(); nextEp(); }
+    if ((e.key === 'p' || e.key === 'P') && isOpen('player')) { e.preventDefault(); prevEp(); }
+  });
+}
+function toggleFullscreen() {
+  const shell = $('player-shell'); if (!shell) return;
+  if (document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+  else shell.requestFullscreen().catch(()=>{});
+}
+
+function bindGlobalClicks() {
+  document.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-open], [data-play], [data-play-ep], [data-resume], [data-remove-cw], [data-star], [data-del-review], [data-server], [data-audio], [data-genre], [data-scroll], [data-dot], [data-close], [data-toggle-server], [data-al-filter], [data-theme-opt], [data-device], [data-open-settings]');
+    if (!el) return;
+    if (el.hasAttribute('data-close')) { const id = el.dataset.close || el.closest('.layer')?.id; if (id) closeLayer(id); return; }
+    if (el.hasAttribute('data-open-settings')) { openLayer('settings'); return; }
+    if (el.hasAttribute('data-scroll')) { const rail = $('rail-' + el.dataset.scroll); if (rail) rail.scrollBy({ left: Number(el.dataset.dir) * rail.clientWidth * 0.8, behavior: 'smooth' }); return; }
+    if (el.hasAttribute('data-dot')) { heroGo(Number(el.dataset.dot)); return; }
+    if (el.hasAttribute('data-open')) { openDetail(Number(el.dataset.open)); return; }
+    if (el.hasAttribute('data-play')) { const m = state.media.get(Number(el.dataset.play)); if (m) openPlayer(m, 1); return; }
+    if (el.hasAttribute('data-play-ep')) { const m = state.detail || state.media.get(Number(el.dataset.playEp)); if (m) openPlayer(m, Number(el.dataset.ep)); return; }
+    if (el.hasAttribute('data-resume')) { resumeContinue(Number(el.dataset.resume)); return; }
+    if (el.hasAttribute('data-remove-cw')) { removeContinue(Number(el.dataset.removeCw)); renderContinueRail(); if (state.view === 'list') renderList(); return; }
+    if (el.hasAttribute('data-genre')) { const g = el.dataset.genre; if (!location.hash.includes('browse')) location.hash = '#/browse'; setTimeout(() => { const sel = $('f-genre'); if (sel) { sel.value = g; buildFilterSelects(); loadBrowse(true); } }, 50); return; }
+    if (el.hasAttribute('data-theme-opt')) { applyTheme(el.dataset.themeOpt); return; }
+    if (el.hasAttribute('data-device')) { applyDevice(el.dataset.device); return; }
+    if (el.hasAttribute('data-toggle-server')) { const id = el.dataset.toggleServer; const on = el.checked; state.prefs.enabled = state.prefs.enabled || {}; state.prefs.enabled[id] = !!on; lsSetJSON(K.servers, state.prefs); return; }
+    if (el.hasAttribute('data-al-filter')) { state.alFilter = el.dataset.alFilter; renderList(); return; }
+    if (el.hasAttribute('data-star')) { state.starDraft = Number(el.dataset.star); renderReviews(state.detail); return; }
+    if (el.hasAttribute('data-del-review')) { const id = Number(el.dataset.reviewId); delReview(id, Number(el.dataset.delReview)); renderReviews(state.detail); return; }
+    if (el.hasAttribute('data-server')) { switchServer(el.dataset.server); return; }
+    if (el.hasAttribute('data-audio')) { setAudio(el.dataset.audio); return; }
+  });
+}
+
+function bindNavbar() {
+  const acc = $('btn-account'), menu = $('account-menu');
+  acc.addEventListener('click', () => { if (!state.token) { openLayer('settings'); return; } menu.hidden = !menu.hidden; });
+  $('btn-logout').addEventListener('click', () => { menu.hidden = true; logout(); });
+  $('btn-settings').addEventListener('click', () => openLayer('settings'));
+  $('btn-surprise').addEventListener('click', async () => { try { const d = await gql('{ Page(perPage: 1) { media(type: ANIME, sort: RANDOM, isAdult: false) { id } } }'); const id = d.Page.media[0] && d.Page.media[0].id; if (id) openDetail(id); } catch (e) {} });
+  $('btn-shortcuts').addEventListener('click', () => openLayer('shortcuts'));
+  if ($('s-shortcuts')) $('s-shortcuts').addEventListener('click', () => openLayer('shortcuts'));
+  $('btn-search-mobile').addEventListener('click', () => { const nav = document.querySelector('.navbar'); nav.classList.toggle('search-open'); const inp = $('search-input'); if (nav.classList.contains('search-open') && inp) setTimeout(()=>inp.focus(), 50); });
+
+  const inp = $('search-input');
+  inp.addEventListener('input', (e) => onSearchInput(e.target.value));
+  inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { const q = e.target.value.trim(); if (q) location.hash = '#/search?q=' + encodeURIComponent(q); } });
+  $('search-clear').addEventListener('click', () => { $('search-input').value = ''; history.replaceState(null,'', location.pathname + location.search); if (state.view === 'search') location.hash = '#/home'; });
+
+  $('filters').addEventListener('change', () => loadBrowse(true));
+  $('filters').addEventListener('reset', () => { setTimeout(()=>loadBrowse(true), 0); });
+  $('browse-more').addEventListener('click', () => { state.browse.page += 1; loadBrowse(false); });
+
+  $('d-play').addEventListener('click', () => { const m = state.detail; if (!m) return; const cont = getContinue()[m.id]; openPlayer(m, cont ? cont.ep : 1); });
+  $('d-fav').addEventListener('click', () => { const m = state.detail; if (!m) return; const on = toggleFav(m); $('d-fav').setAttribute('aria-pressed', String(on)); $('d-fav').querySelector('span').textContent = t(on ? 'favRemove' : 'favAdd'); });
+  $('d-trailer').addEventListener('click', () => { const m = state.detail; if (!m || !m.trailer || m.trailer.site !== 'youtube') { toast(t('noTrailer')); return; } $('trailer-frame').src = `https://www.youtube.com/embed/${m.trailer.id}?autoplay=1`; openLayer('trailer'); });
+  document.querySelector('#trailer [data-close]').addEventListener('click', () => { $('trailer-frame').src = 'about:blank'; });
+
+  $('review-form').addEventListener('submit', (e) => {
+    e.preventDefault(); const m = state.detail; if (!m) return;
+    const err = $('review-err');
+    if (!state.starDraft) { err.hidden = false; err.textContent = t('needStars'); return; }
+    err.hidden = true;
+    const text = $('review-text').value.trim().slice(0,600);
+    saveReview(m.id, { stars: state.starDraft, text, ts: Date.now() });
+    state.starDraft = 0; $('review-text').value = '';
+    toast(t('reviewSaved'), { type:'ok' }); renderReviews(m);
+  });
+
+  $('p-prev').addEventListener('click', prevEp);
+  $('p-next').addEventListener('click', nextEp);
+  $('p-reload').addEventListener('click', loadPlayerSource);
+  $('p-fullscreen').addEventListener('click', toggleFullscreen);
+  $('p-episode').addEventListener('change', (e) => { const p = state.player; if (!p) return; p.ep = Number(e.target.value); saveContinue(p.media, p.ep); paintPlayerChrome(); loadPlayerSource(); });
+  qsa('#p-audio [data-audio]').forEach(b => b.addEventListener('click', () => setAudio(b.dataset.audio)));
+
+  $('s-device').addEventListener('click', (e) => { const b = e.target.closest('[data-device]'); if (b) applyDevice(b.dataset.device); });
+  $('s-theme').addEventListener('click', (e) => { const b = e.target.closest('[data-theme-opt]'); if (b) applyTheme(b.dataset.themeOpt); });
+  $('s-lang').addEventListener('change', (e) => setLang(e.target.value));
+  $('o-lang').addEventListener('change', (e) => setLang(e.target.value));
+  $('s-nsfw').addEventListener('change', (e) => { state.nsfw = e.target.checked; lsSet(K.nsfw, e.target.checked ? '1':'0'); });
+  $('s-privacy').addEventListener('change', (e) => { state.privacy = e.target.checked; lsSet(K.privacy, e.target.checked ? '1':'0'); renderContinueRail(); });
+  $('s-default-server').addEventListener('change', (e) => { state.prefs.default = e.target.value; lsSetJSON(K.servers, state.prefs); });
+  $('s-clear-history').addEventListener('click', () => { lsSetJSON(K.cont, {}); lsSetJSON(K.watched, {}); toast(t('historyCleared'), { type:'ok' }); renderContinueRail(); renderList(); });
+  $('s-clear-cache').addEventListener('click', () => { try { Object.keys(sessionStorage).filter(k=>k.startsWith('loft_q_')).forEach(k=>sessionStorage.removeItem(k)); } catch (e) {} toast(t('cacheCleared'), { type:'ok' }); });
+  $('s-al-login').addEventListener('click', login);
+  $('s-al-logout').addEventListener('click', () => logout());
+  $('btn-clear-history').addEventListener('click', () => { lsSetJSON(K.cont, {}); lsSetJSON(K.watched, {}); toast(t('historyCleared'), { type:'ok' }); renderContinueRail(); renderList(); });
+  $('m-retry').addEventListener('click', () => location.reload());
+}
+
+async function initApp() {
+  if (handleOAuthCallback()) {}
+  state.lang = detectLang(); state.theme = lsGet(K.theme, 'dark'); state.audio = lsGet(K.audio, 'sub');
+  document.documentElement.lang = state.lang;
+  const langMeta = I18N.languages.find(l=>l.code===state.lang);
+  if (langMeta) document.documentElement.dir = langMeta.dir || 'ltr';
+  fillLangSelects(); applyI18n(); loadScriptFont(state.lang); applyTheme(state.theme);
+  await loadServersConfig(); await loadGenres(); buildFilterSelects();
+  renderTagline(); renderAuth(); paintSettings();
+  bindNavbar(); bindGlobalClicks(); initKeyboard(); initMascot(); maybeOnboard();
+  if (!location.hash) location.hash = '#/home';
+  else route();
+  window.addEventListener('hashchange', route);
+}
+
+document.addEventListener('DOMContentLoaded', initApp);
