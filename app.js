@@ -74,20 +74,6 @@ const DEFAULT_SERVERS = {
       enabled: true,
       url: 'https://vidlink.pro/anime/{malId}/{ep}/{audio}?fallback=true'
     },
-    {
-      id: 'autoembed',
-      label: 'AutoEmbed',
-      type: 'embed',
-      enabled: true,
-      url: 'https://player.autoembed.cc/embed/anime/{anilistId}/{ep}'
-    },
-    {
-      id: 'multiembed',
-      label: 'MultiEmbed',
-      type: 'embed',
-      enabled: true,
-      url: 'https://multiembed.mov/directstream.php?video_id={anilistId}&s=1&e={ep}'
-    }
   ]
 };
 
