@@ -45,14 +45,56 @@ const DEFAULT_SERVERS = {
   version: 2,
   maintenance: false,
   message: { en: 'We are improving Anime Loft. Please come back in a few minutes.' },
-  servers: [
-    { id: 'vidsrccc', label: 'Vidsrc.cc', type: 'embed', enabled: true, url: 'https://vidsrc.cc/v2/embed/anime/ani{anilistId}/{ep}/{audio}' },
-    { id: 'megaplay', label: 'MegaPlay', type: 'embed', enabled: true, url: 'https://megaplay.buzz/stream/ani/{anilistId}/{ep}/{audio}' },
-    { id: 'megaplaymal', label: 'MegaPlay (MAL)', type: 'embed', enabled: true, url: 'https://megaplay.buzz/stream/mal/{malId}/{ep}/{audio}' },
-    { id: 'vidsrcme', label: 'Vidsrc.me', type: 'embed', enabled: true, url: 'https://vidsrc.me/embed/anime/ani{anilistId}/{ep}/{audio}' },
-    { id: 'vidsrcnet', label: 'Vidsrc.net', type: 'embed', enabled: true, url: 'https://vidsrc.net/embed/anime/ani{anilistId}/{ep}/{audio}' },
-    { id: 'vidlink', label: 'VidLink Pro', type: 'embed', enabled: true, url: 'https://vidlink.pro/anime/{malId}/{ep}/{audio}' },
-    { id: 'multiembed', label: 'MultiEmbed', type: 'embed', enabled: true, url: 'https://multiembed.mov/directstream.php?video_id={anilistId}&s=1&e={ep}' }
+    servers: [
+    {
+      id: 'megaplay',
+      label: 'MegaPlay (AniList)',
+      type: 'embed',
+      enabled: true,
+      url: 'https://megaplay.buzz/stream/ani/{anilistId}/{ep}/{audio}'
+    },
+    {
+      id: 'megaplaymal',
+      label: 'MegaPlay (MAL)',
+      type: 'embed',
+      enabled: true,
+      url: 'https://megaplay.buzz/stream/mal/{malId}/{ep}/{audio}'
+    },
+    {
+      id: 'animeembed',
+      label: 'AnimeEmbed (Multi-Sub)',
+      type: 'embed',
+      enabled: true,
+      url: 'https://animeembed.com/embed/ani/{anilistId}/{ep}'
+    },
+    {
+      id: 'vidlink',
+      label: 'VidLink Pro',
+      type: 'embed',
+      enabled: true,
+      url: 'https://vidlink.pro/anime/{malId}/{ep}/{audio}?fallback=true'
+    },
+    {
+      id: 'vidsrc_cc',
+      label: 'VidSrc CC (AniList)',
+      type: 'embed',
+      enabled: true,
+      url: 'https://vidsrc.cc/v2/embed/anime/ani{anilistId}/{ep}/{audio}'
+    },
+    {
+      id: 'autoembed',
+      label: 'AutoEmbed',
+      type: 'embed',
+      enabled: true,
+      url: 'https://player.autoembed.cc/embed/anime/{anilistId}/{ep}'
+    },
+    {
+      id: 'multiembed',
+      label: 'MultiEmbed',
+      type: 'embed',
+      enabled: true,
+      url: 'https://multiembed.mov/directstream.php?video_id={anilistId}&s=1&e={ep}'
+    }
   ]
 };
 
