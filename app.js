@@ -75,13 +75,6 @@ const DEFAULT_SERVERS = {
       url: 'https://vidlink.pro/anime/{malId}/{ep}/{audio}?fallback=true'
     },
     {
-      id: 'vidsrc_cc',
-      label: 'VidSrc CC (AniList)',
-      type: 'embed',
-      enabled: true,
-      url: 'https://vidsrc.cc/v2/embed/anime/ani{anilistId}/{ep}/{audio}'
-    },
-    {
       id: 'autoembed',
       label: 'AutoEmbed',
       type: 'embed',
