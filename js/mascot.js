@@ -1,7 +1,7 @@
 'use strict';
 
 window.LoftMascot = {
-  say: function(repaint) {
+  say: function() {
     const el = document.getElementById('mascot-say');
     if (!el) return;
     el.innerHTML = 'O Anime Loft é open source e não tem anúncios. Use <b>AdBlock</b> ou <b>Brave</b> para bloquear os ads dos players!';
@@ -19,8 +19,28 @@ window.LoftMascot = {
       if (el) el.textContent = `Que tal assistir "${m.title.english || m.title.romaji}"?`;
     }).catch(() => { if (el) el.textContent = 'Erro ao buscar.'; });
   },
+  toggle: function() {
+    const m = document.getElementById('mascot');
+    if (m) m.classList.toggle('min');
+  },
   init: function() {
-    this.say(true);
+    this.say();
+    const minBtn = document.getElementById('mascot-min');
+    const avatarBtn = document.getElementById('mascot-avatar');
+    if (minBtn) minBtn.onclick = () => this.toggle();
+    if (avatarBtn) avatarBtn.onclick = () => this.toggle();
+    
+    // Tenta buscar a foto da Yuki
+    fetch('https://graphql.anilist.co', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ query: `query { Character(search: "Yuki Nagato") { image { large } } }` })
+    }).then(r => r.json()).then(d => {
+      const img = d.data.Character.image.large;
+      if (img && avatarBtn) {
+        avatarBtn.style.backgroundImage = `url("${img}")`;
+        avatarBtn.classList.add('has-img');
+      }
+    }).catch(() => {});
   }
 };
 document.addEventListener('DOMContentLoaded', () => {
