@@ -106,12 +106,22 @@ function parseHash() { const h = location.hash.replace(/^#\/?/, ''); const [path
 function route() { const { path, params } = parseHash(); const view = ['home', 'browse', 'list', 'search'].includes(path) ? path : 'home'; showView(view); if (view === 'home') loadHome(); if (view === 'browse') { if (!state.browse.ok && !state.browse.loading) loadBrowse(true); } if (view === 'list') renderList(); if (view === 'search') runSearch(params.get('q') || ''); }
 function showView(view) { if (state.view !== view) window.scrollTo(0, 0); state.view = view; qsa('[data-view-panel]').forEach((p) => { p.hidden = p.dataset.viewPanel !== view; }); qsa('[data-view]').forEach((a) => { if (a.dataset.view === view) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); }); if (view !== 'home') stopHero(); else startHero(); if (view !== 'search' && document.activeElement !== $('search-input')) $('search-input').value = ''; document.title = view === 'home' ? 'Anime Loft' : `${t(view)} · Anime Loft`; }
 
-const HOME_QUERY = `query($season: MediaSeason, $year: Int, $adult: Boolean) { 
-  trending: Page(perPage: 20) { media(type: ANIME, sort: TRENDING_DESC, isAdult: $adult) { ${MEDIA_FIELDS} description } } 
-  season: Page(perPage: 20) { media(type: ANIME, season: $season, seasonYear: $year, sort: POPULARITY_DESC, isAdult: $adult) { ${MEDIA_FIELDS} } } 
-  top: Page(perPage: 20) { media(type: ANIME, sort: SCORE_DESC, isAdult: $adult) { ${MEDIA_FIELDS} } } 
+const HOME_QUERY = `query($season: MediaSeason, $year: Int, $nSeason: MediaSeason, $nYear: Int, $adult: Boolean) {
+  trending: Page(perPage: 20) { media(type: ANIME, sort: TRENDING_DESC, isAdult: $adult) { ${MEDIA_FIELDS} description } }
+  season: Page(perPage: 20) { media(type: ANIME, season: $season, seasonYear: $year, sort: POPULARITY_DESC, isAdult: $adult) { ${MEDIA_FIELDS} } }
+  airing: Page(perPage: 20) { media(type: ANIME, status: RELEASING, sort: [TRENDING_DESC, POPULARITY_DESC], isAdult: $adult) { ${MEDIA_FIELDS} } }
+  top: Page(perPage: 20) { media(type: ANIME, sort: SCORE_DESC, isAdult: $adult) { ${MEDIA_FIELDS} } }
+  upcoming: Page(perPage: 20) { media(type: ANIME, season: $nSeason, seasonYear: $nYear, sort: POPULARITY_DESC, isAdult: $adult) { ${MEDIA_FIELDS} } }
+  movies: Page(perPage: 20) { media(type: ANIME, format: MOVIE, sort: [SCORE_DESC, POPULARITY_DESC], isAdult: $adult) { ${MEDIA_FIELDS} } }
 }`;
-const HOME_ROWS = [{ key: 'trending', label: 'rowTrending' }, { key: 'season', label: 'rowSeason' }, { key: 'top', label: 'rowTop' }];
+const HOME_ROWS = [
+  { key: 'trending', label: 'rowTrending' },
+  { key: 'season', label: 'rowSeason' },
+  { key: 'airing', label: 'rowAiring' },
+  { key: 'top', label: 'rowTop' },
+  { key: 'upcoming', label: 'rowUpcoming' },
+  { key: 'movies', label: 'rowMovies' }
+];
 function rowShell(id, label) { return `<section class="row" aria-labelledby="h-${id}"><div class="row-head"><h2 class="heading-5" id="h-${id}">${esc(t(label))}</h2></div><div class="rail" id="rail-${id}">${skeletonCards(8)}</div></section>`; }
 let homeData = null;
 async function loadHome(force = false) { 
