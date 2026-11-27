@@ -106,11 +106,34 @@ function parseHash() { const h = location.hash.replace(/^#\/?/, ''); const [path
 function route() { const { path, params } = parseHash(); const view = ['home', 'browse', 'list', 'search'].includes(path) ? path : 'home'; showView(view); if (view === 'home') loadHome(); if (view === 'browse') { if (!state.browse.ok && !state.browse.loading) loadBrowse(true); } if (view === 'list') renderList(); if (view === 'search') runSearch(params.get('q') || ''); }
 function showView(view) { if (state.view !== view) window.scrollTo(0, 0); state.view = view; qsa('[data-view-panel]').forEach((p) => { p.hidden = p.dataset.viewPanel !== view; }); qsa('[data-view]').forEach((a) => { if (a.dataset.view === view) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); }); if (view !== 'home') stopHero(); else startHero(); if (view !== 'search' && document.activeElement !== $('search-input')) $('search-input').value = ''; document.title = view === 'home' ? 'Anime Loft' : `${t(view)} · Anime Loft`; }
 
-const HOME_QUERY = `query($season: MediaSeason, $year: Int, $nSeason: MediaSeason, $nYear: Int, $adult: Boolean) { trending: Page(perPage: 20) { media(type: ANIME, sort: TRENDING_DESC, isAdult: $adult) { ${MEDIA_FIELDS} description } } season: Page(perPage: 20) { media(type: ANIME, season: $season, seasonYear: $year, sort: POPULARITY_DESC, isAdult: $adult) { ${MEDIA_FIELDS} } } top: Page(perPage: 20) { media(type: ANIME, sort: SCORE_DESC, isAdult: $adult) { ${MEDIA_FIELDS} } } }`;
+const HOME_QUERY = `query($season: MediaSeason, $year: Int, $adult: Boolean) { 
+  trending: Page(perPage: 20) { media(type: ANIME, sort: TRENDING_DESC, isAdult: $adult) { ${MEDIA_FIELDS} description } } 
+  season: Page(perPage: 20) { media(type: ANIME, season: $season, seasonYear: $year, sort: POPULARITY_DESC, isAdult: $adult) { ${MEDIA_FIELDS} } } 
+  top: Page(perPage: 20) { media(type: ANIME, sort: SCORE_DESC, isAdult: $adult) { ${MEDIA_FIELDS} } } 
+}`;
 const HOME_ROWS = [{ key: 'trending', label: 'rowTrending' }, { key: 'season', label: 'rowSeason' }, { key: 'top', label: 'rowTop' }];
 function rowShell(id, label) { return `<section class="row" aria-labelledby="h-${id}"><div class="row-head"><h2 class="heading-5" id="h-${id}">${esc(t(label))}</h2></div><div class="rail" id="rail-${id}">${skeletonCards(8)}</div></section>`; }
 let homeData = null;
-async function loadHome(force = false) { renderContinueRail(); if (homeData && !force) { paintHome(); return; } $('hero').innerHTML = '<div class="skeleton" aria-hidden="true"></div>'; $('home-rows').innerHTML = HOME_ROWS.map((r) => rowShell(r.key, r.label)).join(''); const cur = currentSeason(0), nxt = currentSeason(1); const vars = { season: cur.season, year: cur.year, nSeason: nxt.season, nYear: nxt.year }; const adult = adultVar(); if (adult !== undefined) vars.adult = adult; try { homeData = await gql(HOME_QUERY, vars); HOME_ROWS.forEach((r) => remember(homeData[r.key].media)); paintHome(); } catch (e) { $('hero').innerHTML = ''; $('home-rows').innerHTML = errorHTML(() => loadHome(true), e); } }
+async function loadHome(force = false) { 
+  renderContinueRail(); 
+  if (homeData && !force) { paintHome(); return; } 
+  $('hero').innerHTML = '<div class="skeleton" aria-hidden="true"></div>'; 
+  $('home-rows').innerHTML = HOME_ROWS.map((r) => rowShell(r.key, r.label)).join(''); 
+  
+  const cur = currentSeason(0); 
+  const vars = { season: cur.season, year: cur.year }; // <-- Removi o nSeason e nYear daqui
+  const adult = adultVar(); 
+  if (adult !== undefined) vars.adult = adult; 
+  
+  try { 
+    homeData = await gql(HOME_QUERY, vars); 
+    HOME_ROWS.forEach((r) => remember(homeData[r.key].media)); 
+    paintHome(); 
+  } catch (e) { 
+    $('hero').innerHTML = ''; 
+    $('home-rows').innerHTML = errorHTML(() => loadHome(true), e); 
+  } 
+}
 function paintHome() { if (!homeData) return; const featured = homeData.trending.media.filter((m) => m.bannerImage).slice(0, 6); renderHero(featured.length ? featured : homeData.trending.media.slice(0, 6)); $('home-rows').innerHTML = HOME_ROWS.map((r) => rowShell(r.key, r.label)).join(''); HOME_ROWS.forEach((r) => { const list = homeData[r.key].media; $('rail-' + r.key).innerHTML = list.length ? list.map((m) => cardHTML(m)).join('') : emptyHTML('ph-calendar-blank', t('noResults')); }); state.homeLoaded = true; }
 function renderHero(items) { state.hero.items = items; state.hero.index = 0; if (!items.length) { $('hero').innerHTML = ''; return; } const slides = items.map((m, i) => { const desc = stripHtml(m.description || ''); const meta = [fmtLabel(m.format), m.seasonYear, m.episodes ? t('eps', { n: m.episodes }) : '', m.averageScore ? `★ ${(m.averageScore / 10).toFixed(1)}` : ''].filter(Boolean); return `<div class="hero-slide${i === 0 ? ' on' : ''}" data-i="${i}" aria-roledescription="slide" aria-label="${i + 1} / ${items.length}"${i === 0 ? '' : ' aria-hidden="true"'}><img src="${esc(m.bannerImage || coverOf(m))}" alt="" ${i === 0 ? 'fetchpriority="high"' : 'loading="lazy"'}><div class="hero-copy"><div class="hero-meta">${meta.map((x) => `<span class="badge">${esc(x)}</span>`).join('')}</div><h2 class="heading-2 hero-grad clamp-2">${esc(titleOf(m))}</h2>${desc ? `<p class="body-6 hero-desc clamp-2">${esc(desc)}</p>` : ''}<div class="hero-ctas"><button type="button" class="btn btn-primary" data-play="${m.id}" ${i === 0 ? '' : 'tabindex="-1"'}><i class="ph-fill ph-play"></i>${esc(t('watchNow'))}</button><button type="button" class="btn btn-secondary" data-open="${m.id}" ${i === 0 ? '' : 'tabindex="-1"'}><i class="ph ph-info"></i>${esc(t('details'))}</button></div></div></div>`; }).join(''); const dots = items.map((_, i) => `<button type="button" class="hero-dot${i === 0 ? ' on' : ''}" data-dot="${i}" aria-label="Slide ${i + 1}"></button>`).join(''); $('hero').innerHTML = `<div class="hero-stage" id="hero-stage">${slides}<div class="hero-dots">${dots}</div></div>`; const stage = $('hero-stage'); stage.addEventListener('mouseenter', stopHero); stage.addEventListener('mouseleave', startHero); stage.addEventListener('focusin', stopHero); stage.addEventListener('focusout', startHero); startHero(); }
 function heroGo(i) { const n = state.hero.items.length; if (!n) return; state.hero.index = (i + n) % n; qsa('.hero-slide').forEach((s, k) => { const on = k === state.hero.index; s.classList.toggle('on', on); if (on) s.removeAttribute('aria-hidden'); else s.setAttribute('aria-hidden', 'true'); qsa('button', s).forEach((b) => { if (on) b.removeAttribute('tabindex'); else b.setAttribute('tabindex', '-1'); }); }); qsa('.hero-dot').forEach((d, k) => { d.classList.remove('on'); if (k === state.hero.index) { void d.offsetWidth; d.classList.add('on'); } }); startHero(); }
