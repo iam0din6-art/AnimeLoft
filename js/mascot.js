@@ -14,22 +14,22 @@ window.LoftMascot = {
     if (!el) return;
 
     let txt = '';
-    try {
-      txt = typeof t === 'function' ? t(this.lines[this.idx]) : '';
-    } catch (e) {
-      txt = '';
-    }
-    
-    // NOVO TEXTO: Explicativo, sobre open source, players de terceiros e anúncios.
-    if (!txt || txt === this.lines[this.idx] || this.lines[this.idx] === 'tipAdblock') {
-      if (this.lines[this.idx] === 'tipAdblock') {
-        txt = 'O Anime Loft é um projeto de código aberto (open source). Nós não hospedamos vídeos; usamos players de terceiros que podem exibir anúncios. Para uma navegação limpa, recomendamos usar o <b>AdBlock</b> ou o navegador <b>Brave</b>.';
-      } else {
+
+    // Se for a mensagem do Adblock, usa o texto exato que queremos, ignorando o i18n.js
+    if (this.lines[this.idx] === 'tipAdblock') {
+      txt = 'O Anime Loft é open source e não tem anúncios. Os players de terceiros podem exibir ads. Use <b>AdBlock</b> ou <b>Brave</b> para bloquear!';
+    } else {
+      try {
+        txt = typeof t === 'function' ? t(this.lines[this.idx]) : '';
+      } catch (e) {
+        txt = '';
+      }
+      if (!txt || txt === this.lines[this.idx]) {
         txt = 'Oi, eu sou a Yuki.';
       }
     }
 
-    // Transforma "AdBlock" e "Brave" em links clicáveis
+    // Transforma as palavras em links
     txt = txt.replace(/(AdBlock|Brave)/gi, (match) => {
       const url = match.toLowerCase() === 'adblock' 
         ? 'https://getadblock.com/' 
@@ -50,8 +50,6 @@ window.LoftMascot = {
   },
 
   recommend: function() {
-    if (!window.LoftMascot) return;
-    
     const el = document.getElementById('mascot-say');
     if (el) el.textContent = 'Buscando um anime para você...';
 
@@ -64,11 +62,7 @@ window.LoftMascot = {
             const list = data.Page.media;
             const randomAnime = list[Math.floor(Math.random() * list.length)];
             const title = randomAnime.title.english || randomAnime.title.romaji;
-            
-            if (typeof openDetail === 'function') {
-              openDetail(randomAnime.id);
-            }
-            
+            if (typeof openDetail === 'function') openDetail(randomAnime.id);
             if (el) el.textContent = `Que tal assistir "${title}"?`;
           } else {
             if (el) el.textContent = 'Não encontrei nenhum anime agora.';
@@ -77,8 +71,6 @@ window.LoftMascot = {
         .catch(() => {
           if (el) el.textContent = 'Ocorreu um erro ao buscar.';
         });
-    } else {
-      if (el) el.textContent = 'A API não está disponível.';
     }
   },
 
