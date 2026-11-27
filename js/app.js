@@ -9,17 +9,15 @@
 /* ---------------------------------------------------------------------
    Constants
    --------------------------------------------------------------------- */
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.0.1'; // Versão atualizada
 const ANILIST_API = 'https://graphql.anilist.co';
 const GITHUB_URL = 'https://github.com/iam0din6-art/AnimeLoft';
 const DISCORD_URL = 'https://discord.gg/3qeKkseWSs';
 const SERVERS_URL = 'servers.json';
-const QUERY_TTL = 15 * 60 * 1000;          // catalog cache lifetime
-const EMBED_TIMEOUT_MS = 15000;            // when to show the "switch server" hint
+const QUERY_TTL = 15 * 60 * 1000;          
+const EMBED_TIMEOUT_MS = 15000;            
 const HERO_INTERVAL = 8000;
 
-/* Optional build-time config: window.LOFT_CONFIG = { anilistClientId: '12345' } */
-// rateMax / rateWindowMs: o AniList aceita poucas requisições por minuto; ficamos abaixo do limite
 const CONFIG = Object.assign({ anilistClientId: '', rateMax: 24, rateWindowMs: 60000 }, window.LOFT_CONFIG || {});
 
 const K = {
@@ -77,7 +75,6 @@ function lsJSON(key, fallback) {
     const v = localStorage.getItem(key);
     if (!v) return fallback;
     const p = JSON.parse(v);
-    // dado corrompido ou de outro formato: usa o padrão
     if (p === null || typeof p !== typeof fallback || Array.isArray(p) !== Array.isArray(fallback)) return fallback;
     return p;
   } catch (e) { return fallback; }
@@ -101,7 +98,7 @@ function hashStr(s) {
 const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /* ---------------------------------------------------------------------
-   i18n (strings live in i18n.js → window.LOFT_I18N)
+   i18n
    --------------------------------------------------------------------- */
 const I18N = window.LOFT_I18N || { languages: [{ code: 'en', name: 'English', dir: 'ltr' }], strings: { en: {} } };
 const FONT_FOR = {
@@ -189,14 +186,14 @@ const state = {
   token: null,
   viewer: null,
   view: 'home',
-  media: new Map(),          // id → media object seen anywhere
-  detail: null,              // full media shown in the detail modal
+  media: new Map(),
+  detail: null,
   epPage: 0,
-  player: null,              // { anime, ep, server, audio }
+  player: null,
   browse: { page: 1, hasNext: false, loading: false, seq: 0 },
   searchSeq: 0,
   hero: { items: [], index: 0, timer: null },
-  stack: [],                 // open layer ids, top is last
+  stack: [],
   lastFocus: [],
   genres: GENRES_FALLBACK,
   alFilter: 'CURRENT',
@@ -204,7 +201,7 @@ const state = {
 };
 
 /* ---------------------------------------------------------------------
-   Toasts (z-70)
+   Toasts
    --------------------------------------------------------------------- */
 function toast(msg, { type = 'info', action = null, ms = 4200 } = {}) {
   const icon = { info: 'ph-info', ok: 'ph-check-circle', error: 'ph-warning-circle' }[type] || 'ph-info';
@@ -241,18 +238,15 @@ const MEDIA_FIELDS = `
 function adultVar() { return state.nsfw ? null : false; }
 
 const RATE = { stamps: [], warnedAt: 0 };
-const inflight = new Map(); // o mesmo pedido feito ao mesmo tempo compartilha uma única chamada de rede
+const inflight = new Map();
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function apiError(kind, message) {
   const e = new Error(message || kind);
-  e.kind = kind; // 'offline' | 'network' | 'rate' | 'api' | 'auth'
+  e.kind = kind;
   return e;
 }
 
-/* Espera a vez: se já foram feitas rateMax requisições na janela, aguarda abrir espaço.
-   Esperar aqui sai mais barato do que ser bloqueado: a resposta de bloqueio do AniList não traz
-   cabeçalhos CORS, então o navegador só enxerga "falha de rede" e a tela mostra erro de conexão. */
 async function acquireSlot() {
   for (;;) {
     const now = Date.now();
@@ -264,7 +258,6 @@ async function acquireSlot() {
   }
 }
 
-/* Uma consulta ao AniList. Falha de rede, 429 e 5xx são tentados de novo com espera crescente. */
 async function gqlFetch(query, variables, useAuth) {
   const headers = { 'Content-Type': 'application/json', Accept: 'application/json' };
   if (useAuth) headers.Authorization = `Bearer ${state.token}`;
@@ -305,7 +298,6 @@ async function gqlFetch(query, variables, useAuth) {
   }
 }
 
-/* cache: sessionStorage (15 min). persist = ms guarda no localStorage (dados que quase não mudam). */
 async function gql(query, variables = {}, { auth = false, cache = true, persist = 0 } = {}) {
   const useAuth = auth && state.token;
   const shared = cache && !useAuth;
@@ -367,7 +359,6 @@ function currentSeason(offset = 0) {
   return { season: seasons[idx], year };
 }
 
-/* Episodes a viewer can actually press play on */
 function releasedEpisodes(m) {
   if (!m) return 0;
   if (m.nextAiringEpisode && m.nextAiringEpisode.episode) return Math.max(0, m.nextAiringEpisode.episode - 1);
@@ -559,7 +550,6 @@ function renderHero(items) {
   stage.addEventListener('mouseleave', startHero);
   stage.addEventListener('focusin', stopHero);
   stage.addEventListener('focusout', startHero);
-  // swipe on touch
   let x0 = null;
   stage.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; }, { passive: true });
   stage.addEventListener('touchend', (e) => {
@@ -595,7 +585,7 @@ function startHero() {
 function stopHero() { clearTimeout(state.hero.timer); state.hero.timer = null; }
 
 /* ---------------------------------------------------------------------
-   Continue watching / watched episodes / favorites (localStorage)
+   Continue watching / watched episodes / favorites
    --------------------------------------------------------------------- */
 function getContinue() { return lsJSON(K.cont, {}); }
 function saveContinue(anime, ep, time = 0, duration = 0) {
@@ -725,10 +715,21 @@ const onSearchInput = debounce((q) => {
 /* ---------------------------------------------------------------------
    Browse: categories & filters
    --------------------------------------------------------------------- */
-const BROWSE_QUERY = `query($page: Int, $season: MediaSeason, $seasonYear: Int, $from: FuzzyDateInt, $to: FuzzyDateInt, $format: MediaFormat, $genre: String, $sort: [MediaSort], $adult: Boolean) {
+// QUERY CORRIGIDA
+const BROWSE_QUERY = `query($page: Int, $season: MediaSeason, $seasonYear: Int, $startDate_greater: FuzzyDateInt, $startDate_lesser: FuzzyDateInt, $format: MediaFormat, $genre: String, $sort: [MediaSort], $adult: Boolean) {
   Page(page: $page, perPage: 30) {
     pageInfo { hasNextPage total }
-    media(type: ANIME, season: $season, seasonYear: $seasonYear, startDate_greater: $from, startDate_lesser: $to, format: $format, genre: $genre, sort: $sort, isAdult: $adult) { ${MEDIA_FIELDS} }
+    media(
+      type: ANIME, 
+      season: $season, 
+      seasonYear: $seasonYear, 
+      startDate_greater: $startDate_greater, 
+      startDate_lesser: $startDate_lesser, 
+      format: $format, 
+      genre: $genre, 
+      sort: $sort, 
+      isAdult: $adult
+    ) { ${MEDIA_FIELDS} }
   }
 }`;
 
@@ -757,20 +758,34 @@ async function loadGenres() {
   } catch (e) { /* fallback list stays */ }
 }
 
+// FUNÇÃO CORRIGIDA CONTRA O ERRO "Illegal operator"
 function browseVars(page) {
   const year = Number($('f-year').value) || null;
   const season = $('f-season').value || null;
-  return {
+  const format = $('f-format').value || null;
+  const genre = $('f-genre').value || null;
+  const sortValue = $('f-sort').value || 'POPULARITY_DESC';
+
+  const vars = {
     page,
-    season,
-    seasonYear: season && year ? year : null,
-    from: !season && year ? year * 10000 : null,
-    to: !season && year ? (year + 1) * 10000 : null,
-    format: $('f-format').value || null,
-    genre: $('f-genre').value || null,
-    sort: [$('f-sort').value || 'POPULARITY_DESC'],
-    adult: adultVar()
+    adult: adultVar(),
+    sort: [sortValue],
+    format,
+    genre
   };
+
+  // O AniList quebra se mandar 'season' sem 'seasonYear'
+  if (season && year) {
+    vars.season = season;
+    vars.seasonYear = year;
+  } else if (year) {
+    vars.startDate_greater = year * 10000;
+    vars.startDate_lesser = (year + 1) * 10000;
+  } else if (season) {
+    vars.season = season;
+  }
+
+  return vars;
 }
 
 async function loadBrowse(reset) {
@@ -787,6 +802,7 @@ async function loadBrowse(reset) {
     const vars = browseVars(b.page);
     const data = await gql(BROWSE_QUERY, vars);
     if (seq !== b.seq) { b.loading = false; return; }
+    
     const pageInfo = data.Page.pageInfo;
     const list = remember(data.Page.media);
     b.hasNext = pageInfo.hasNextPage;
@@ -819,11 +835,10 @@ async function getMedia(id) {
 }
 
 /* ---------------------------------------------------------------------
-   Layers: detail z-50 · player z-60 · trailer z-65 · settings z-75 ·
-   maintenance z-80 · onboarding z-90 (z-index lives in style.css)
+   Layers
    --------------------------------------------------------------------- */
 const LAYER_Z = { detail: 50, player: 60, trailer: 65, settings: 75, shortcuts: 75, maintenance: 80, onboarding: 90 };
-const STICKY_LAYERS = ['maintenance', 'onboarding']; // Esc and the scrim never dismiss these
+const STICKY_LAYERS = ['maintenance', 'onboarding'];
 
 function isOpen(id) { return state.stack.includes(id); }
 
@@ -836,7 +851,7 @@ function topLayer() {
 function syncLayerChrome() {
   const any = state.stack.length > 0;
   document.body.classList.toggle('locked', any);
-  document.body.classList.toggle('layer-open', any); // hides the mascot while a window is open
+  document.body.classList.toggle('layer-open', any);
 }
 
 function openLayer(id, focusSel) {
@@ -985,7 +1000,6 @@ function renderRelated(m) {
   $('d-related').innerHTML = nodes.map((n) => cardHTML(n)).join('');
 }
 
-/* AniList entry (status) for the open title */
 async function paintAlSelect(id) {
   const sel = $('d-al-status');
   sel.innerHTML = ['NONE', ...AL_STATUSES].map((s) => `<option value="${s}">${esc(t('al_' + s))}</option>`).join('');
@@ -1020,7 +1034,6 @@ async function onAlStatus(e) {
   }
 }
 
-/* When an episode starts, push the progress to AniList if the title is on the user's list */
 async function syncProgress(anime, ep) {
   if (!state.token) return;
   try {
@@ -1031,7 +1044,7 @@ async function syncProgress(anime, ep) {
     const status = entry.status === 'PLANNING' || entry.status === 'PAUSED' || entry.status === 'DROPPED' ? 'CURRENT' : entry.status;
     const r = await gql('mutation($m: Int, $p: Int, $s: MediaListStatus) { SaveMediaListEntry(mediaId: $m, progress: $p, status: $s) { id status progress } }', { m: anime.id, p: ep, s: status }, { auth: true, cache: false });
     state.alEntries.set(anime.id, r.SaveMediaListEntry);
-  } catch (e) { /* silent: the player must never depend on AniList */ }
+  } catch (e) { /* silent */ }
 }
 
 /* ---------------------------------------------------------------------
@@ -1047,7 +1060,7 @@ function openTrailer() {
 }
 
 /* ---------------------------------------------------------------------
-   Reviews (localStorage, per anime id)
+   Reviews
    --------------------------------------------------------------------- */
 function getReviews(id) { return lsJSON(K.reviews + id, []); }
 function starsText(n) { const r = Math.round(n); return '★'.repeat(r) + '☆'.repeat(5 - r); }
@@ -1066,7 +1079,7 @@ function paintStarInput() {
 }
 
 function renderReviews(m) {
-  if (state.reviewFor !== m.id) { // new title: clear the form (re-renders keep what the user typed)
+  if (state.reviewFor !== m.id) {
     state.reviewFor = m.id;
     state.pendingStars = 0;
     $('review-text').value = '';
@@ -1097,7 +1110,7 @@ function submitReview(e) {
   err.hidden = true;
   const list = getReviews(m.id);
   list.unshift({
-    name: state.viewer ? state.viewer.name : null, // null = guest, translated when shown
+    name: state.viewer ? state.viewer.name : null,
     avatar: state.viewer ? state.viewer.avatar : '',
     stars: state.pendingStars,
     text: $('review-text').value.trim().slice(0, 600),
@@ -1111,7 +1124,7 @@ function submitReview(e) {
 }
 
 /* ---------------------------------------------------------------------
-   Player (embed iframe, no sandbox)
+   Player
    --------------------------------------------------------------------- */
 function orderedServers() {
   const prefs = state.prefs;
@@ -1121,7 +1134,6 @@ function orderedServers() {
   return list;
 }
 
-/* Fills {anilistId} {malId} {ep} {audio} {dub}; null when a needed value is missing */
 function embedUrl(server, anime, ep, audio) {
   const ctx = { anilistId: anime.id, malId: anime.idMal, ep, audio, dub: audio === 'dub' ? 1 : 0 };
   let missing = false;
@@ -1168,7 +1180,6 @@ function openPlayer(anime, ep) {
   loadStream();
 }
 
-/* Loads the current server into the iframe, skipping servers with no source for this title */
 function loadStream() {
   const p = state.player;
   if (!p) return;
@@ -1193,7 +1204,7 @@ function loadStream() {
     frame.src = url;
     $('p-direct').href = url;
     paintPlayerChrome();
-    state.hintTimer = setTimeout(() => { // still black? offer the way out
+    state.hintTimer = setTimeout(() => {
       overlay.classList.add('gone');
       $('stage-hint').hidden = false;
     }, EMBED_TIMEOUT_MS);
@@ -1215,7 +1226,7 @@ function stopPlayer() {
   if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
   renderContinueRail();
   if (state.view === 'list') renderList();
-  if (state.detail) renderDetail(state.detail); // watched marks + resume label
+  if (state.detail) renderDetail(state.detail);
 }
 
 function paintPlayerChrome() {
@@ -1341,7 +1352,7 @@ function scrollRail(id, dir) {
 }
 
 /* ---------------------------------------------------------------------
-   Surprise me + mascot (Yuki Nagato) + tagline
+   Surprise me + mascot + tagline
    --------------------------------------------------------------------- */
 const SURPRISE_QUERY = `query($page: Int, $adult: Boolean) {
   Page(page: $page, perPage: 50) { media(type: ANIME, averageScore_greater: 78, sort: POPULARITY_DESC, isAdult: $adult) { ${MEDIA_FIELDS} } }
@@ -1356,7 +1367,7 @@ async function surprise() {
   } catch (e) { toast(t('loadErr'), { type: 'error' }); }
 }
 
-const MASCOT_LINES = ['mascotHi', 'tip1', 'tip2', 'tip3', 'tip4'];
+const MASCOT_LINES = ['mascotHi', 'tip1', 'tip2', 'tip3', 'tip4', 'tipAdblock'];
 let mascotIdx = 0;
 let mascotTimer = null;
 
@@ -1376,14 +1387,38 @@ function toggleMascot() {
   lsSet(K.mascot, min ? '1' : '0');
 }
 
+// FUNÇÃO NOVA: Detecta AdBlock / Brave
+function adblockLikelyActive() {
+  if (navigator.brave) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const bait = document.createElement('div');
+    bait.className = 'ad-banner adsbox pub_300x250';
+    bait.style.cssText = 'position:absolute;left:-9999px;top:-9999px;width:1px;height:1px';
+    document.body.appendChild(bait);
+    setTimeout(() => {
+      const blocked = bait.offsetParent === null || bait.offsetHeight === 0;
+      bait.remove();
+      resolve(blocked);
+    }, 100);
+  });
+}
+
+// FUNÇÃO ATUALIZADA: Chama a detecção
 async function initMascot() {
   const savedMascot = lsGet(K.mascot);
   paintMascotMin(savedMascot === '1' || (savedMascot === null && state.device !== 'pc'));
   mascotIdx = 0;
   mascotSay(true);
+  
   clearInterval(mascotTimer);
   mascotTimer = setInterval(() => { if (!document.hidden && !$('mascot').classList.contains('min')) mascotSay(); }, 25000);
-  try { // portrait comes from AniList; the book icon stays if it fails
+  
+  try {
+    const blocked = await adblockLikelyActive();
+    if (!blocked) $('mascot-say').textContent = t('tipAdblock');
+  } catch(e) {}
+
+  try {
     const d = await gql('query($s: String) { Character(search: $s) { name { userPreferred } image { large } } }', { s: 'Yuki Nagato' }, { persist: 7 * 24 * 3600 * 1000 });
     const c = d && d.Character;
     if (c && c.image && c.image.large) {
@@ -1477,7 +1512,7 @@ function paintSettings() {
 
 function savePrefs() { lsSetJSON(K.servers, state.prefs); }
 
-function resetCatalog() { // after changing the 18+ filter or clearing the cache
+function resetCatalog() {
   pruneQueryCache(true);
   homeData = null;
   $('browse-grid').innerHTML = '';
@@ -1495,7 +1530,7 @@ function clearHistory() {
 }
 
 /* ---------------------------------------------------------------------
-   AniList sign-in (implicit grant) and account menu
+   AniList sign-in
    --------------------------------------------------------------------- */
 function readToken() {
   const exp = Number(lsGet(K.tokenExp) || 0);
@@ -1505,7 +1540,6 @@ function readToken() {
   return null;
 }
 
-/* AniList redirects back with #access_token=…: grab it before the router sees the hash */
 function captureToken() {
   if (!/access_token=/.test(location.hash)) return false;
   const p = new URLSearchParams(location.hash.replace(/^#\/?/, ''));
@@ -1599,7 +1633,7 @@ function showMaintenance(message) {
   $('m-msg').textContent = pickMessage(message) || pickMessage(DEFAULT_SERVERS.message);
   openLayer('maintenance', '#m-retry');
   clearInterval(state.maintTimer);
-  state.maintTimer = setInterval(loadServersConfig, 60000); // lifts itself when the flag turns off
+  state.maintTimer = setInterval(loadServersConfig, 60000);
 }
 
 function hideMaintenance() {
@@ -1607,7 +1641,6 @@ function hideMaintenance() {
   closeLayer('maintenance');
 }
 
-/* Fresh file wins; otherwise the last good copy; otherwise the built-in list. Maintenance only counts when fresh */
 async function loadServersConfig() {
   let cfg = null;
   let fresh = false;
@@ -1628,7 +1661,7 @@ async function loadServersConfig() {
 }
 
 /* ---------------------------------------------------------------------
-   Keyboard: Esc · F · / · arrows · N / P
+   Keyboard
    --------------------------------------------------------------------- */
 function focusablesIn(root) {
   return qsa('a[href], button:not([disabled]), select:not([disabled]), input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])', root)
@@ -1676,8 +1709,6 @@ function trapTab(e) {
   else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
 }
 
-/* O CSS reserva espaço com --nav-h (navbar fixa) e --tab-h (barra de abas do celular).
-   Se estas variáveis não forem medidas, o conteúdo, a mascote e os avisos ficam por cima das abas. */
 function syncChrome() {
   const root = document.documentElement.style;
   const nav = $('navbar');
@@ -1726,7 +1757,7 @@ function onKey(e) {
     if (e.key === 'p' || e.key === 'P') { e.preventDefault(); changeEpisode(state.player.ep - 1); return; }
   }
   if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
-    if (tag === 'SELECT' && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) return; // native select
+    if (tag === 'SELECT' && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) return;
     const interactive = el !== document.body && el.matches && el.matches('a, button, [tabindex], select, input');
     if (!interactive && state.device !== 'tv') return;
     if (spatialMove(e.key)) e.preventDefault();
@@ -1763,7 +1794,6 @@ function bindEvents() {
   window.addEventListener('offline', () => toast(t('offline'), { type: 'error' }));
   window.addEventListener('online', () => { toast(t('online'), { type: 'ok' }); if (!state.homeLoaded && state.view === 'home') loadHome(true); });
 
-  // search
   const input = $('search-input');
   input.addEventListener('input', (e) => onSearchInput(e.target.value));
   input.addEventListener('keydown', (e) => {
@@ -1773,7 +1803,7 @@ function bindEvents() {
       if (q) location.hash = '#/search?q=' + encodeURIComponent(q);
     }
   });
-  $('search-form').addEventListener('submit', (e) => e.preventDefault()); // no page reload
+  $('search-form').addEventListener('submit', (e) => e.preventDefault());
   $('search-clear').addEventListener('click', () => { input.value = ''; location.hash = '#/home'; });
   $('btn-search-mobile').addEventListener('click', () => {
     const nav = $('navbar');
@@ -1782,20 +1812,17 @@ function bindEvents() {
   });
   $('btn-surprise').addEventListener('click', surprise);
 
-  // browse
-  const loadBrowseSoon = debounce(() => loadBrowse(true), 350); // vários selects em sequência = 1 requisição
+  const loadBrowseSoon = debounce(() => loadBrowse(true), 350);
   $('filters').addEventListener('change', () => { syncChips(); loadBrowseSoon(); });
   $('filters').addEventListener('reset', () => setTimeout(() => { syncChips(); loadBrowseSoon(); }, 0));
   $('browse-more').addEventListener('click', () => { if (state.browse.loading || !state.browse.hasNext) return; state.browse.page += 1; loadBrowse(false); });
 
-  // list
   $('btn-clear-history').addEventListener('click', clearHistory);
   $('al-filter').addEventListener('click', (e) => {
     const b = e.target.closest('[data-al]');
     if (b) { state.alFilter = b.dataset.al; renderAniListBlock(); }
   });
 
-  // detail
   $('d-play').addEventListener('click', () => {
     const m = state.detail;
     if (!m) return;
@@ -1820,7 +1847,6 @@ function bindEvents() {
     renderReviews(state.detail);
   });
 
-  // player
   $('p-prev').addEventListener('click', () => state.player && changeEpisode(state.player.ep - 1));
   $('p-next').addEventListener('click', () => state.player && changeEpisode(state.player.ep + 1));
   $('p-episode').addEventListener('change', (e) => changeEpisode(Number(e.target.value)));
@@ -1844,7 +1870,6 @@ function bindEvents() {
     if (state.player && $('embed-player').src !== 'about:blank') $('stage-loading').classList.add('gone');
   });
 
-  // settings
   $('btn-settings').addEventListener('click', () => openLayer('settings'));
   $('s-shortcuts').addEventListener('click', () => openLayer('shortcuts'));
   $('btn-shortcuts').addEventListener('click', () => openLayer('shortcuts'));
@@ -1876,7 +1901,6 @@ function bindEvents() {
   $('s-clear-history').addEventListener('click', clearHistory);
   $('s-clear-cache').addEventListener('click', () => { resetCatalog(); toast(t('cacheCleared'), { type: 'ok' }); });
 
-  // account + maintenance + mascot
   $('btn-account').addEventListener('click', onAccountClick);
   $('btn-logout').addEventListener('click', () => logout());
   $('m-retry').addEventListener('click', loadServersConfig);
@@ -1901,7 +1925,6 @@ function registerServiceWorker() {
 }
 
 function initApp() {
-  // runtime-only state
   Object.assign(state, {
     alSeq: 0, alEntries: new Map(), hintTimer: null, maintTimer: null,
     pendingStars: 0, reviewFor: null, detailId: null
@@ -1909,18 +1932,14 @@ function initApp() {
   if (!state.prefs || typeof state.prefs !== 'object') state.prefs = { enabled: {}, default: '' };
   if (!state.prefs.enabled || typeof state.prefs.enabled !== 'object') state.prefs.enabled = {};
 
-  // language first: sets <html lang/dir> and the script font (Arabic is RTL)
   setLang(detectLang(), { rerender: false, persist: false });
 
-  // links and version from the constants, so there is one place to change them
   qsa('[data-github]').forEach((a) => { a.href = GITHUB_URL; });
   qsa('[data-discord]').forEach((a) => { a.href = DISCORD_URL; });
 
-  // sign-in redirect comes back as #access_token=…
   captureToken();
   state.token = readToken();
 
-  // theme / device (the inline script in <head> already painted the saved values)
   setTheme(state.theme);
   setDevice(state.device || detectDevice(), { persist: false });
 
@@ -1936,7 +1955,6 @@ function initApp() {
   loadGenres();
   if (state.token) loadViewer(true);
 
-  // first visit: ask which device is being used
   if (!lsGet(K.device)) {
     openLayer('onboarding', `[data-pick-device="${state.device}"]`);
   }
