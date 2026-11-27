@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '3.1.0';
+const APP_VERSION = '3.1.1';
 const ANILIST_API = 'https://graphql.anilist.co';
 const GITHUB_URL = 'https://github.com/iam0din6-art/AnimeLoft';
 const DISCORD_URL = 'https://discord.gg/3qeKkseWSs';
@@ -117,6 +117,19 @@ async function gql(query, variables = {}, { auth = false, cache = true, persist 
   const job = gqlFetch(query, variables, useAuth).then((data) => { if (shared) { try { store.setItem(key, JSON.stringify({ at: Date.now(), data })); } catch (e) {} } return data; });
   if (shared) { inflight.set(key, job); job.then(() => inflight.delete(key), () => inflight.delete(key)); }
   return job;
+}
+
+function pruneQueryCache(force) {
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith('loft_q_') || (force && k.startsWith('loft_p_')))) localStorage.removeItem(k);
+    }
+    for (let i = sessionStorage.length - 1; i >= 0; i--) {
+      const k = sessionStorage.key(i);
+      if (k && k.startsWith('loft_q_')) sessionStorage.removeItem(k);
+    }
+  } catch (e) {}
 }
 
 // Helpers de dados
@@ -419,7 +432,7 @@ function pickDevice(mode) { setDevice(mode); closeLayer('onboarding'); }
 function setTheme(name) { if (!['dark', 'oled', 'sky'].includes(name)) name = 'dark'; state.theme = name; document.documentElement.dataset.theme = name; lsSet(K.theme, name); const meta = document.querySelector('meta[name="theme-color"]'); const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(); if (meta && bg) meta.setAttribute('content', bg); paintSettings(); }
 function paintSettings() { qsa('#s-device button[data-device]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.device === state.device))); qsa('#s-theme [data-theme-opt]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.themeOpt === state.theme))); if ($('s-lang')) $('s-lang').value = state.lang; if ($('s-nsfw')) $('s-nsfw').checked = state.nsfw; if ($('s-privacy')) $('s-privacy').checked = state.privacy; const embeds = state.config.servers.filter((s) => s.enabled !== false); if ($('s-default-server')) { $('s-default-server').innerHTML = embeds.map((s) => `<option value="${esc(s.id)}">${esc(s.label)}</option>`).join(''); $('s-default-server').value = state.prefs.default && embeds.some((s) => s.id === state.prefs.default) ? state.prefs.default : (embeds[0] ? embeds[0].id : ''); } if ($('s-servers')) { $('s-servers').innerHTML = embeds.map((s) => { let host = ''; try { host = new URL(s.url.replace(/\{\w+\}/g, '1')).hostname; } catch (e) {} return `<li class="toggle-row"><div><span class="body-5">${esc(s.label)}</span><p class="caption-5 muted">${esc(host)}</p></div><input type="checkbox" class="switch" role="switch" data-srv-toggle="${esc(s.id)}" ${state.prefs.enabled[s.id] === false ? '' : 'checked'}></li>`; }).join(''); } if ($('s-al-hint')) $('s-al-hint').textContent = t('alHint'); if ($('s-client-id')) $('s-client-id').value = lsGet(K.clientId) || CONFIG.anilistClientId || ''; if ($('s-redirect')) $('s-redirect').textContent = location.origin + location.pathname; if ($('s-al-login')) $('s-al-login').hidden = Boolean(state.viewer); if ($('s-al-logout')) $('s-al-logout').hidden = !state.viewer; if ($('s-version')) $('s-version').textContent = t('version', { v: APP_VERSION }); }
 function savePrefs() { lsSetJSON(K.servers, state.prefs); }
-function resetCatalog() { homeData = null; if ($('browse-grid')) $('browse-grid').innerHTML = ''; buildFilterSelects(); route(); }
+function resetCatalog() { pruneQueryCache(true); homeData = null; if ($('browse-grid')) $('browse-grid').innerHTML = ''; buildFilterSelects(); route(); }
 function clearHistory() { lsDel(K.cont); lsDel(K.watched); renderContinueRail(); if (state.view === 'list') renderList(); if (state.detail) renderDetail(state.detail); toast(t('historyCleared'), { type: 'ok' }); }
 
 // Auth
