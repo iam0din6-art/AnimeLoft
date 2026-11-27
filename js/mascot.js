@@ -3,6 +3,7 @@
 window.LoftMascot = {
   idx: 0,
   timer: null,
+  // Lista de falas que ela vai rotacionar
   lines: ['mascotHi', 'tipAdblock', 'tipDiscord', 'tipGithub', 'tip1', 'tip2', 'tip3', 'tip4'],
 
   say: function(repaint) {
@@ -10,25 +11,14 @@ window.LoftMascot = {
     const el = document.getElementById('mascot-say');
     if (!el) return;
     
-    // Puxa a tradução do i18n.js baseada no idioma selecionado
+    // Puxa a tradução do arquivo i18n.js baseada no idioma selecionado
     let txt = typeof t === 'function' ? t(this.lines[this.idx]) : '';
-    el.textContent = txt || "Olá! Eu sou a Yuki.";
-  },
-
-  paintMin: function(min) {
-    const m = document.getElementById('mascot');
-    const a = document.getElementById('mascot-avatar');
-    if (m) m.classList.toggle('min', min);
-    if (a) a.setAttribute('aria-expanded', String(!min));
+    el.textContent = txt;
   },
 
   toggle: function() {
     const m = document.getElementById('mascot');
-    if (!m) return;
-    const min = !m.classList.contains('min');
-    this.paintMin(min);
-    const key = (typeof K !== 'undefined' && K.mascot) ? K.mascot : 'loft_mascot_min';
-    localStorage.setItem(key, min ? '1' : '0');
+    if (m) m.classList.toggle('min');
   },
 
   detectAdblock: function() {
@@ -47,31 +37,22 @@ window.LoftMascot = {
   },
 
   init: async function() {
-    const key = (typeof K !== 'undefined' && K.mascot) ? K.mascot : 'loft_mascot_min';
-    const savedMascot = localStorage.getItem(key);
-    this.paintMin(savedMascot === '1');
-
-    this.idx = 0;
     this.say(true);
+    setInterval(() => { if (!document.hidden) this.say(); }, 25000);
 
-    clearInterval(this.timer);
-    this.timer = setInterval(() => {
-      if (!document.hidden && !document.getElementById('mascot').classList.contains('min')) {
-        this.say();
-      }
-    }, 25000);
-
+    // Se não tiver Adblock, já fala a frase do Adblock logo de cara
     try {
       const blocked = await this.detectAdblock();
       if (!blocked) {
         const el = document.getElementById('mascot-say');
         if (el) {
           el.textContent = typeof t === 'function' ? t('tipAdblock') : "Use um Adblock ou Brave.";
-          this.idx = 1;
+          this.idx = 1; // Pula direto para a mensagem do adblock
         }
       }
     } catch (e) {}
 
+    // Puxa a foto oficial dela do AniList
     try {
       if (typeof gql === 'function') {
         const d = await gql('query($s: String) { Character(search: $s) { name { userPreferred } image { large } } }', { s: 'Yuki Nagato' }, { persist: 7 * 24 * 3600 * 1000 });
