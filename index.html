@@ -2,37 +2,15 @@
 <html lang="pt-BR" dir="ltr" data-device="pc" data-theme="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Anime Loft · open source anime streaming</title>
-  <meta name="description" content="Anime Loft is an open source anime catalog and player.">
-  <meta name="theme-color" content="#061521">
-  <meta name="color-scheme" content="dark light">
-
-  <link rel="manifest" href="manifest.json">
-  <link rel="icon" type="image/png" sizes="48x48" href="assets/favicon-48.png">
-  <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
-  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
-
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Anime Loft</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preconnect" href="https://graphql.anilist.co" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Metal+Mania&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
   <link rel="stylesheet" href="style.css">
-
-  <script>
-    (function () {
-      try {
-        var d = document.documentElement;
-        d.dataset.theme = localStorage.getItem('loft_theme') || 'dark';
-        d.dataset.device = localStorage.getItem('loft_device_mode') || 'pc';
-      } catch (e) {}
-    })();
-  </script>
 </head>
-
 <body>
-  <a class="skip-link" href="#app-main" data-i18n="skip">Pular para o conteúdo</a>
 
   <!-- NAVBAR -->
   <header id="navbar" class="navbar">
@@ -57,8 +35,8 @@
       <div class="nav-actions">
         <button id="btn-search-mobile" type="button" class="icon-btn show-mobile" aria-label="Search"><i class="ph ph-magnifying-glass"></i></button>
         <button id="btn-surprise" type="button" class="icon-btn" data-i18n-title="surprise" title="Surpreenda-me"><i class="ph ph-shuffle"></i></button>
-        <a class="icon-btn hide-mobile" data-github href="#" target="_blank" rel="noopener noreferrer" aria-label="GitHub" title="GitHub"><i class="ph ph-github-logo"></i></a>
-        <a class="icon-btn hide-mobile" data-discord href="#" target="_blank" rel="noopener noreferrer" aria-label="Discord" title="Discord"><i class="ph ph-discord-logo"></i></a>
+        <a class="icon-btn hide-mobile" data-github href="#" target="_blank" rel="noopener noreferrer" aria-label="GitHub"><i class="ph ph-github-logo"></i></a>
+        <a class="icon-btn hide-mobile" data-discord href="#" target="_blank" rel="noopener noreferrer" aria-label="Discord"><i class="ph ph-discord-logo"></i></a>
         <button id="btn-settings" type="button" class="icon-btn" data-i18n-title="settings" title="Configurações"><i class="ph ph-gear-six"></i></button>
         <button id="btn-account" type="button" class="account-btn" aria-haspopup="menu">
           <span id="account-avatar" class="avatar"><i class="ph ph-user"></i></span>
@@ -88,21 +66,13 @@
     <section id="view-home" class="view" data-view-panel="home" aria-labelledby="home-h">
       <h1 id="home-h" class="sr-only">Anime Loft</h1>
       <div id="hero" class="hero" aria-roledescription="carousel" aria-label="Featured"></div>
-
       <div class="rows-container">
         <section id="row-continue" class="row" hidden>
-          <div class="row-head">
-            <h2 class="heading-6" data-i18n="continueWatching">Continuar assistindo</h2>
-            <a class="link-sm" href="#/list" data-i18n="seeAll">Ver tudo</a>
-          </div>
+          <div class="row-head"><h2 class="heading-6" data-i18n="continueWatching">Continuar assistindo</h2></div>
           <div class="rail" id="rail-continue"></div>
         </section>
         <div id="home-rows"></div>
       </div>
-      
-      <section class="tagline wrap" aria-label="Tagline">
-        <p id="tagline-text" class="tagline-text"></p>
-      </section>
     </section>
 
     <!-- SEARCH -->
@@ -118,42 +88,31 @@
     <section id="view-browse" class="view wrap" data-view-panel="browse" hidden aria-labelledby="browse-h">
       <div class="page-head">
         <h1 id="browse-h" class="heading-4" data-i18n="browseTitle">Categorias e filtros</h1>
-        <span id="browse-count" class="caption-4 muted" aria-live="polite"></span>
+        <span id="browse-count" class="caption-4 muted"></span>
       </div>
-
       <form id="filters" class="filters" aria-label="Filters">
         <label class="field-wrap"><span class="caption-3" data-i18n="year">Ano</span><select id="f-year" class="field"></select></label>
         <label class="field-wrap"><span class="caption-3" data-i18n="season">Temporada</span>
           <select id="f-season" class="field">
             <option value="" data-i18n="any">Qualquer</option>
-            <option value="WINTER" data-i18n="WINTER">Inverno</option>
-            <option value="SPRING" data-i18n="SPRING">Primavera</option>
-            <option value="SUMMER" data-i18n="SUMMER">Verão</option>
-            <option value="FALL" data-i18n="FALL">Outono</option>
+            <option value="WINTER">Inverno</option><option value="SPRING">Primavera</option><option value="SUMMER">Verão</option><option value="FALL">Outono</option>
           </select></label>
         <label class="field-wrap"><span class="caption-3" data-i18n="format">Formato</span>
           <select id="f-format" class="field">
             <option value="" data-i18n="any">Qualquer</option>
-            <option value="TV">TV</option>
-            <option value="MOVIE" data-i18n="MOVIE">Filme</option>
-            <option value="OVA">OVA</option>
-            <option value="ONA">ONA</option>
-            <option value="SPECIAL" data-i18n="SPECIAL">Especial</option>
-            <option value="TV_SHORT" data-i18n="TV_SHORT">Curta</option>
+            <option value="TV">TV</option><option value="MOVIE">Filme</option><option value="OVA">OVA</option><option value="ONA">ONA</option>
           </select></label>
         <label class="field-wrap"><span class="caption-3" data-i18n="genre">Gênero</span><select id="f-genre" class="field"></select></label>
         <label class="field-wrap"><span class="caption-3" data-i18n="sort">Ordenar por</span>
           <select id="f-sort" class="field">
-            <option value="POPULARITY_DESC" data-i18n="sortPopular">Mais populares</option>
-            <option value="TRENDING_DESC" data-i18n="sortTrending">Em alta</option>
-            <option value="SCORE_DESC" data-i18n="sortScore">Mais bem avaliados</option>
-            <option value="START_DATE_DESC" data-i18n="sortNewest">Mais recentes</option>
-            <option value="FAVOURITES_DESC" data-i18n="sortFavs">Mais favoritados</option>
+            <option value="POPULARITY_DESC">Mais populares</option>
+            <option value="TRENDING_DESC">Em alta</option>
+            <option value="SCORE_DESC">Mais bem avaliados</option>
+            <option value="START_DATE_DESC">Mais recentes</option>
           </select></label>
         <button type="reset" class="btn btn-secondary field-reset"><i class="ph ph-arrow-counter-clockwise"></i><span data-i18n="reset">Redefinir</span></button>
       </form>
-
-      <div id="genre-chips" class="chips" role="group" aria-label="Quick genres"></div>
+      <div id="genre-chips" class="chips" role="group"></div>
       <div id="browse-grid" class="grid"></div>
       <div class="center-pad"><button id="browse-more" type="button" class="btn btn-secondary" hidden><span data-i18n="loadMore">Carregar mais</span></button></div>
     </section>
@@ -164,25 +123,20 @@
         <h1 id="list-h" class="heading-4" data-i18n="myList">Minha lista</h1>
         <span id="list-sync" class="caption-4 muted"></span>
       </div>
-
-      <section class="list-block" aria-labelledby="lc-h">
+      <section class="list-block">
         <div class="row-head">
-          <h2 id="lc-h" class="heading-6"><i class="ph ph-play-circle"></i> <span data-i18n="continueWatching">Continuar assistindo</span></h2>
+          <h2 class="heading-6"><i class="ph ph-play-circle"></i> <span data-i18n="continueWatching">Continuar assistindo</span></h2>
           <button id="btn-clear-history" type="button" class="link-sm" data-i18n="clearHistory">Limpar histórico</button>
         </div>
         <div id="list-continue" class="continue-list"></div>
       </section>
-
-      <section class="list-block" aria-labelledby="lf-h">
-        <div class="row-head">
-          <h2 id="lf-h" class="heading-6"><i class="ph ph-heart"></i> <span data-i18n="favorites">Favoritos</span></h2>
-        </div>
+      <section class="list-block">
+        <div class="row-head"><h2 class="heading-6"><i class="ph ph-heart"></i> <span data-i18n="favorites">Favoritos</span></h2></div>
         <div id="list-favs" class="grid"></div>
       </section>
-
-      <section id="list-anilist" class="list-block" hidden aria-labelledby="la-h">
+      <section id="list-anilist" class="list-block" hidden>
         <div class="row-head">
-          <h2 id="la-h" class="heading-6"><i class="ph ph-cloud-check"></i> <span data-i18n="anilistLists">Sua lista do AniList</span></h2>
+          <h2 class="heading-6"><i class="ph ph-cloud-check"></i> <span data-i18n="anilistLists">Sua lista do AniList</span></h2>
           <div id="al-filter" class="seg" role="tablist"></div>
         </div>
         <div id="list-al" class="grid"></div>
@@ -192,14 +146,11 @@
     <!-- FOOTER -->
     <footer class="footer wrap">
       <a href="#/home" class="wordmark wordmark-sm" aria-label="Anime Loft"><span class="wm-anime">ANIME</span><span class="wm-loft">LOFT</span></a>
-      
       <p class="body-6 muted" data-i18n="footNote">O Anime Loft é um catálogo de código aberto. Não hospedamos arquivos; os streams vêm de provedores terceiros que podem exibir anúncios. Dados por AniList.</p>
-      
       <div class="open-source-banner">
         <i class="ph ph-heart-half"></i>
         <p><strong>Apoie o projeto:</strong> O Anime Loft é sem fins lucrativos. Para bloquear os anúncios dos players externos, recomendamos o <a href="https://getadblock.com/" target="_blank" rel="noopener noreferrer">AdBlock</a> ou o navegador <a href="https://brave.com/download/" target="_blank" rel="noopener noreferrer">Brave</a>.</p>
       </div>
-
       <div class="footer-links">
         <a data-github href="#" target="_blank" rel="noopener noreferrer"><i class="ph ph-github-logo"></i> GitHub</a>
         <a data-discord href="#" target="_blank" rel="noopener noreferrer"><i class="ph ph-discord-logo"></i> Discord</a>
@@ -216,9 +167,7 @@
       <strong class="title-4" id="mascot-name">Yuki Nagato</strong>
       <p class="body-6" id="mascot-say"></p>
       <div class="mascot-actions">
-        <button type="button" id="mascot-recommend" class="btn btn-secondary btn-sm" onclick="LoftMascot.recommend()">
-          <i class="ph ph-sparkle"></i> Recomendar
-        </button>
+        <button type="button" id="mascot-recommend" class="btn btn-secondary btn-sm" onclick="LoftMascot.recommend()"><i class="ph ph-sparkle"></i> Recomendar</button>
         <a class="btn btn-discord btn-sm" data-discord href="#" target="_blank" rel="noopener noreferrer"><i class="ph ph-discord-logo"></i><span data-i18n="joinDiscord">Discord</span></a>
         <a class="btn btn-secondary btn-sm" data-github href="#" target="_blank" rel="noopener noreferrer"><i class="ph ph-github-logo"></i>GitHub</a>
       </div>
@@ -244,45 +193,19 @@
               <button type="button" id="d-play" class="btn btn-primary"><i class="ph-fill ph-play"></i><span></span></button>
               <button type="button" id="d-trailer" class="btn btn-secondary"><i class="ph ph-film-strip"></i><span data-i18n="trailer">Trailer</span></button>
               <button type="button" id="d-fav" class="btn btn-secondary" aria-pressed="false"><i class="ph ph-heart"></i><span></span></button>
-              <label class="al-status" id="d-al-wrap" hidden>
-                <span class="sr-only" data-i18n="anilistStatus">Status no AniList</span>
-                <i class="ph ph-cloud-arrow-up" aria-hidden="true"></i>
-                <select id="d-al-status" class="field field-sm"></select>
-              </label>
+              <label class="al-status" id="d-al-wrap" hidden><select id="d-al-status" class="field field-sm"></select></label>
             </div>
           </div>
         </div>
         <p id="d-desc" class="body-6 d-desc pretty"></p>
         <div id="d-genres" class="chips chips-static"></div>
-        <section class="d-section" aria-labelledby="d-eps-h">
-          <div class="row-head">
-            <h3 id="d-eps-h" class="heading-6" data-i18n="episodes">Episódios</h3>
-            <div class="row-head-tools">
-              <select id="d-ep-range" class="field field-sm" hidden aria-label="Episode range"></select>
-              <span id="d-ep-note" class="caption-4 muted"></span>
-            </div>
+        <section class="d-section">
+          <div class="row-head"><h3 class="heading-6" data-i18n="episodes">Episódios</h3>
+            <div class="row-head-tools"><select id="d-ep-range" class="field field-sm" hidden></select><span id="d-ep-note" class="caption-4 muted"></span></div>
           </div>
           <div id="d-episodes" class="ep-grid"></div>
         </section>
-        <section class="d-section" id="d-rel-wrap" hidden aria-labelledby="d-rel-h">
-          <h3 id="d-rel-h" class="heading-6" data-i18n="related">Relacionados e recomendados</h3>
-          <div class="rail rail-sm" id="d-related"></div>
-        </section>
-        <section class="d-section" aria-labelledby="d-rev-h">
-          <h3 id="d-rev-h" class="heading-6" data-i18n="reviews">Avaliações da comunidade</h3>
-          <form id="review-form" class="review-form" novalidate>
-            <div class="stars-input" role="radiogroup" data-i18n-aria="yourRating" aria-label="Sua nota"></div>
-            <label class="sr-only" for="review-text" data-i18n="commentPh">Comentário</label>
-            <textarea id="review-text" class="field" rows="3" maxlength="600" data-i18n-ph="commentPh"></textarea>
-            <p id="review-err" class="caption-4 err" role="alert" hidden></p>
-            <div class="review-foot">
-              <span class="caption-5 muted" data-i18n="reviewLocal">Salvo no dispositivo</span>
-              <button type="submit" class="btn btn-primary btn-sm"><i class="ph ph-paper-plane-tilt"></i><span data-i18n="postReview">Publicar</span></button>
-            </div>
-          </form>
-          <div id="review-summary" class="review-summary"></div>
-          <ul id="review-list" class="review-list"></ul>
-        </section>
+        <section class="d-section" id="d-rel-wrap" hidden><h3 class="heading-6" data-i18n="related">Relacionados e recomendados</h3><div class="rail rail-sm" id="d-related"></div></section>
       </div>
     </article>
   </div>
@@ -291,191 +214,41 @@
   <div id="player" class="layer layer-player" role="dialog" aria-modal="true" aria-labelledby="p-title" hidden>
     <div class="player-shell" id="player-shell">
       <header class="player-top">
-        <button type="button" class="icon-btn" data-close aria-label="Close player"><i class="ph ph-arrow-left"></i></button>
-        <div class="player-title">
-          <strong id="p-title" class="title-3 clamp-1"></strong>
-          <span id="p-sub" class="caption-4 muted"></span>
-        </div>
-        <button type="button" id="p-fullscreen" class="icon-btn" aria-label="Fullscreen (F)" title="Fullscreen (F)"><i class="ph ph-corners-out"></i></button>
+        <button type="button" class="icon-btn" data-close><i class="ph ph-arrow-left"></i></button>
+        <div class="player-title"><strong id="p-title" class="title-3 clamp-1"></strong><span id="p-sub" class="caption-4 muted"></span></div>
+        <button type="button" id="p-fullscreen" class="icon-btn"><i class="ph ph-corners-out"></i></button>
       </header>
       <div class="stage" id="stage">
         <iframe id="embed-player" title="Video player" allow="autoplay; fullscreen; encrypted-media; picture-in-picture; clipboard-write" allowfullscreen referrerpolicy="origin"></iframe>
-        <div id="stage-loading" class="stage-overlay">
-          <div class="skeleton stage-skel"></div>
-          <p class="body-5" data-i18n="loadingPlayer">Carregando player</p>
-        </div>
-        <div id="stage-hint" class="stage-hint" hidden>
-          <p class="body-5" data-i18n="playerHint">Tela preta? Troque de servidor.</p>
-        </div>
+        <div id="stage-loading" class="stage-overlay"><div class="skeleton stage-skel"></div><p class="body-5" data-i18n="loadingPlayer">Carregando player</p></div>
+        <div id="stage-hint" class="stage-hint" hidden><p class="body-5" data-i18n="playerHint">Tela preta? Troque de servidor.</p></div>
         <div id="stage-adult" class="stage-adult" hidden>
-          <i class="ph ph-warning-circle big"></i>
-          <h3>Conteúdo +18</h3>
-          <p>Provedores externos não permitem a reprodução deste conteúdo dentro do site.</p>
-          <a id="p-adult-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-lg">
-            <i class="ph ph-external-link"></i> Assistir no Provedor Externo
-          </a>
+          <i class="ph ph-warning-circle big"></i><h3>Conteúdo +18</h3><p>Provedores externos não permitem a reprodução deste conteúdo dentro do site.</p>
+          <a id="p-adult-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-lg"><i class="ph ph-external-link"></i> Assistir no Provedor Externo</a>
         </div>
       </div>
-      <div class="player-bar" role="toolbar" aria-label="Player controls">
+      <div class="player-bar" role="toolbar">
         <div class="pbar-group">
-          <button type="button" id="p-prev" class="icon-btn" aria-label="Anterior"><i class="ph ph-skip-back"></i></button>
-          <div class="pbar-ep-selector">
-            <span class="caption-3 muted">Episódio</span>
-            <select id="p-episode" class="field field-sm"></select>
-          </div>
-          <button type="button" id="p-next" class="icon-btn" aria-label="Próximo"><i class="ph ph-skip-forward"></i></button>
+          <button type="button" id="p-prev" class="icon-btn"><i class="ph ph-skip-back"></i></button>
+          <div class="pbar-ep-selector"><span class="caption-3 muted">Episódio</span><select id="p-episode" class="field field-sm"></select></div>
+          <button type="button" id="p-next" class="icon-btn"><i class="ph ph-skip-forward"></i></button>
         </div>
         <div class="pbar-group">
-          <div class="seg" id="p-audio" role="radiogroup" aria-label="Audio" style="margin-right: 12px;">
-            <button type="button" data-audio="sub" role="radio">SUB</button>
-            <button type="button" data-audio="dub" role="radio">DUB</button>
-          </div>
-          <button type="button" id="p-reload" class="icon-btn" aria-label="Recarregar"><i class="ph ph-arrow-clockwise"></i></button>
-          <a id="p-direct" class="icon-btn" target="_blank" rel="noopener noreferrer" aria-label="Abrir no navegador"><i class="ph ph-rocket-launch"></i></a>
+          <div class="seg" id="p-audio" role="radiogroup" style="margin-right: 12px;"><button type="button" data-audio="sub" role="radio">SUB</button><button type="button" data-audio="dub" role="radio">DUB</button></div>
+          <button type="button" id="p-reload" class="icon-btn"><i class="ph ph-arrow-clockwise"></i></button>
+          <a id="p-direct" class="icon-btn" target="_blank" rel="noopener noreferrer"><i class="ph ph-rocket-launch"></i></a>
         </div>
       </div>
-      <div class="server-row">
-        <span class="caption-3 muted"><i class="ph ph-hard-drives"></i> <span data-i18n="switchServer">Servidor</span></span>
-        <div id="p-servers" class="server-list" role="radiogroup" aria-label="Servers"></div>
-      </div>
+      <div class="server-row"><span class="caption-3 muted"><i class="ph ph-hard-drives"></i> Servidor</span><div id="p-servers" class="server-list" role="radiogroup"></div></div>
     </div>
   </div>
 
-  <!-- TRAILER -->
-  <div id="trailer" class="layer layer-trailer" role="dialog" aria-modal="true" aria-label="Trailer" hidden>
-    <div class="scrim" data-close></div>
-    <div class="trailer-box">
-      <button type="button" class="icon-btn sheet-x" data-close aria-label="Close"><i class="ph ph-x"></i></button>
-      <iframe id="trailer-frame" title="Trailer" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>
-    </div>
-  </div>
-
-  <!-- TOASTS -->
+  <!-- TOASTS / SETTINGS / OUTROS... (para não quebrar o app.js) -->
   <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
-
-  <!-- SETTINGS -->
-  <div id="settings" class="layer layer-settings" role="dialog" aria-modal="true" aria-labelledby="s-title" hidden>
-    <div class="scrim" data-close></div>
-    <div class="sheet settings-sheet">
-      <header class="settings-head">
-        <span class="wordmark wordmark-sm" aria-hidden="true"><span class="wm-anime">ANIME</span><span class="wm-loft">LOFT</span></span>
-        <h2 id="s-title" class="heading-6" data-i18n="settings">Configurações</h2>
-        <button type="button" class="icon-btn" data-close aria-label="Close"><i class="ph ph-x"></i></button>
-      </header>
-      <div class="settings-body">
-        <section class="set-group">
-          <h3 class="title-4 set-h"><i class="ph ph-devices"></i><span data-i18n="device">Dispositivo</span></h3>
-          <div class="seg seg-wide" id="s-device" role="radiogroup">
-            <button type="button" data-device="pc" role="radio"><i class="ph ph-desktop"></i><span data-i18n="devicePc">Computador</span></button>
-            <button type="button" data-device="tv" role="radio"><i class="ph ph-television-simple"></i><span data-i18n="deviceTv">TV / Console</span></button>
-            <button type="button" data-device="mobile" role="radio"><i class="ph ph-device-mobile"></i><span data-i18n="deviceMobile">Celular / Tablet</span></button>
-          </div>
-        </section>
-        <section class="set-group">
-          <h3 class="title-4 set-h"><i class="ph ph-palette"></i><span data-i18n="theme">Tema</span></h3>
-          <div class="theme-cards" id="s-theme" role="radiogroup">
-            <button type="button" data-theme-opt="dark" role="radio"><span class="swatch sw-dark"></span><span data-i18n="themeDark">Escuro</span></button>
-            <button type="button" data-theme-opt="oled" role="radio"><span class="swatch sw-oled"></span><span data-i18n="themeOled">OLED</span></button>
-            <button type="button" data-theme-opt="sky" role="radio"><span class="swatch sw-sky"></span><span data-i18n="themeSky">Claro</span></button>
-          </div>
-        </section>
-        <section class="set-group">
-          <h3 class="title-4 set-h"><i class="ph ph-translate"></i><span data-i18n="language">Idioma</span></h3>
-          <select id="s-lang" class="field" aria-label="Language"></select>
-        </section>
-        <section class="set-group">
-          <h3 class="title-4 set-h"><i class="ph ph-hard-drives"></i><span data-i18n="providers">Provedores de Stream</span></h3>
-          <label class="field-wrap"><span class="caption-3" data-i18n="defaultServer">Servidor padrão</span><select id="s-default-server" class="field"></select></label>
-          <ul id="s-servers" class="toggle-list"></ul>
-        </section>
-        <section class="set-group">
-          <h3 class="title-4 set-h"><i class="ph ph-shield-check"></i><span data-i18n="content">Conteúdo e Privacidade</span></h3>
-          <ul class="toggle-list">
-            <li class="toggle-row">
-              <div><span class="body-5" data-i18n="nsfw">Mostrar títulos +18</span><p class="caption-5 muted" data-i18n="nsfwHint">Títulos adultos ficam ocultos do catálogo até que você ative.</p></div>
-              <input type="checkbox" id="s-nsfw" class="switch" role="switch">
-            </li>
-            <li class="toggle-row">
-              <div><span class="body-5" data-i18n="privacy">Modo privado</span><p class="caption-5 muted" data-i18n="privacyHint">Esconder "Continuar assistindo" da tela inicial.</p></div>
-              <input type="checkbox" id="s-privacy" class="switch" role="switch">
-            </li>
-          </ul>
-        </section>
-        <section class="set-group">
-          <h3 class="title-4 set-h"><i class="ph ph-cloud"></i>AniList</h3>
-          <p class="caption-5 muted" id="s-al-hint"></p>
-          <label class="field-wrap"><span class="caption-3" data-i18n="clientId">Client ID</span><input id="s-client-id" class="field" inputmode="numeric" autocomplete="off" placeholder="12345"></label>
-          <p class="caption-5 muted"><span data-i18n="redirectIs">URL de redirecionamento para registrar:</span> <code id="s-redirect"></code></p>
-          <div class="row-btns">
-            <button type="button" id="s-al-login" class="btn btn-primary btn-sm"><i class="ph ph-sign-in"></i><span data-i18n="login">Entrar</span></button>
-            <button type="button" id="s-al-logout" class="btn btn-ghost btn-sm" hidden><i class="ph ph-sign-out"></i><span data-i18n="logout">Sair</span></button>
-          </div>
-        </section>
-        <section class="set-group">
-          <h3 class="title-4 set-h"><i class="ph ph-database"></i><span data-i18n="data">Seus dados</span></h3>
-          <div class="row-btns">
-            <button type="button" id="s-clear-history" class="btn btn-secondary btn-sm"><i class="ph ph-clock-counter-clockwise"></i><span data-i18n="clearHistory">Limpar histórico</span></button>
-            <button type="button" id="s-clear-cache" class="btn btn-secondary btn-sm"><i class="ph ph-broom"></i><span data-i18n="clearCache">Limpar cache</span></button>
-            <button type="button" id="s-shortcuts" class="btn btn-ghost btn-sm"><i class="ph ph-keyboard"></i><span data-i18n="shortcuts">Atalhos</span></button>
-          </div>
-        </section>
-        <section class="set-group set-community">
-          <h3 class="title-4 set-h"><i class="ph ph-users-three"></i><span data-i18n="community">Comunidade Open Source</span></h3>
-          <div class="row-btns">
-            <a class="btn btn-secondary btn-sm" data-github href="#" target="_blank" rel="noopener noreferrer"><i class="ph ph-github-logo"></i>GitHub</a>
-            <a class="btn btn-discord btn-sm" data-discord href="#" target="_blank" rel="noopener noreferrer"><i class="ph ph-discord-logo"></i>Discord</a>
-          </div>
-          <p class="caption-5 muted" id="s-version"></p>
-        </section>
-      </div>
-    </div>
-  </div>
-
-  <div id="shortcuts" class="layer layer-settings" role="dialog" aria-modal="true" aria-labelledby="k-title" hidden>
-    <div class="scrim" data-close></div>
-    <div class="sheet small-sheet">
-      <header class="settings-head">
-        <h2 id="k-title" class="heading-6" data-i18n="shortcuts">Atalhos</h2>
-        <button type="button" class="icon-btn" data-close aria-label="Close"><i class="ph ph-x"></i></button>
-      </header>
-      <dl class="keys">
-        <div><dt><kbd class="kbd">Esc</kbd></dt><dd data-i18n="kEsc">Fechar janela, player ou trailer</dd></div>
-        <div><dt><kbd class="kbd">F</kbd></dt><dd data-i18n="kF">Tela cheia no player</dd></div>
-        <div><dt><kbd class="kbd">/</kbd></dt><dd data-i18n="kSlash">Focar na busca</dd></div>
-        <div><dt><kbd class="kbd">← ↑ → ↓</kbd></dt><dd data-i18n="kArrows">Navegar entre cards e botões</dd></div>
-        <div><dt><kbd class="kbd">N</kbd> <kbd class="kbd">P</kbd></dt><dd data-i18n="kNP">Próximo ou anterior episódio</dd></div>
-      </dl>
-    </div>
-  </div>
-
-  <div id="maintenance" class="layer layer-maint" role="alertdialog" aria-labelledby="m-title" hidden>
-    <div class="backdrop-art"></div>
-    <div class="maint-box">
-      <span class="wordmark wordmark-xl" aria-hidden="true"><span class="wm-anime">ANIME</span><span class="wm-loft">LOFT</span></span>
-      <h2 id="m-title" class="heading-5" data-i18n="maintTitle">Estamos ajustando o Loft</h2>
-      <p id="m-msg" class="body-6"></p>
-      <div class="row-btns center">
-        <button type="button" id="m-retry" class="btn btn-primary"><i class="ph ph-arrow-clockwise"></i><span data-i18n="retry">Tentar novamente</span></button>
-        <a class="btn btn-discord" data-discord href="#" target="_blank" rel="noopener noreferrer"><i class="ph ph-discord-logo"></i>Discord</a>
-        <a class="btn btn-secondary" data-github href="#" target="_blank" rel="noopener noreferrer"><i class="ph ph-github-logo"></i>GitHub</a>
-      </div>
-    </div>
-  </div>
-
-  <div id="onboarding" class="layer layer-onboard" role="dialog" aria-modal="true" aria-labelledby="o-title" hidden>
-    <div class="backdrop-art"></div>
-    <div class="onboard-box">
-      <span class="wordmark wordmark-xl" aria-hidden="true"><span class="wm-anime">ANIME</span><span class="wm-loft">LOFT</span></span>
-      <h2 id="o-title" class="heading-4 hero-grad balance" data-i18n="deviceQ">Qual dispositivo você está usando?</h2>
-      <p class="body-6 muted pretty" data-i18n="deviceSub">Nós adaptamos o layout, tamanho dos cards e foco para ele. Você pode mudar isso depois nas configurações.</p>
-      <div class="device-cards" role="radiogroup">
-        <button type="button" class="device-card" data-pick-device="pc"><span class="device-emoji" aria-hidden="true">🖥️</span><span class="title-3" data-i18n="devicePc">Computador</span><span class="caption-5 muted">PC · Mac · Laptop</span></button>
-        <button type="button" class="device-card" data-pick-device="tv"><span class="device-emoji" aria-hidden="true">📺</span><span class="title-3" data-i18n="deviceTv">Smart TV / Console</span><span class="caption-5 muted">Controle · Gamepad</span></button>
-        <button type="button" class="device-card" data-pick-device="mobile"><span class="device-emoji" aria-hidden="true">📱</span><span class="title-3" data-i18n="deviceMobile">Celular / Tablet</span><span class="caption-5 muted">Toque</span></button>
-      </div>
-      <label class="onboard-lang"><i class="ph ph-translate" aria-hidden="true"></i><span class="sr-only">Language</span><select id="o-lang" class="field field-sm"></select></label>
-    </div>
-  </div>
+  <div id="settings" class="layer layer-settings" role="dialog" aria-modal="true" hidden><div class="scrim" data-close></div><div class="sheet settings-sheet"><header class="settings-head"><h2 class="heading-6" data-i18n="settings">Configurações</h2><button type="button" class="icon-btn" data-close><i class="ph ph-x"></i></button></header><div class="settings-body"><section class="set-group"><h3 class="title-4 set-h">Idioma</h3><select id="s-lang" class="field"></select></section><section class="set-group"><h3 class="title-4 set-h">Conteúdo</h3><ul class="toggle-list"><li class="toggle-row"><div><span class="body-5" data-i18n="nsfw">Mostrar títulos +18</span></div><input type="checkbox" id="s-nsfw" class="switch" role="switch"></li></ul></section><button id="s-clear-cache" class="btn btn-secondary">Limpar Cache</button></div></div></div>
+  <div id="shortcuts" class="layer layer-settings" role="dialog" aria-modal="true" hidden><div class="scrim" data-close></div></div>
+  <div id="maintenance" class="layer layer-maint" role="alertdialog" hidden><div class="backdrop-art"></div></div>
+  <div id="onboarding" class="layer layer-onboard" role="dialog" aria-modal="true" hidden><div class="backdrop-art"></div><div class="onboard-box"><h2 class="heading-4" data-i18n="deviceQ">Qual dispositivo você está usando?</h2><div class="device-cards"><button type="button" class="device-card" data-pick-device="pc">Computador</button><button type="button" class="device-card" data-pick-device="mobile">Celular</button></div><label class="onboard-lang"><select id="o-lang" class="field field-sm"></select></label></div></div>
 
   <script src="js/i18n.js"></script>
   <script src="js/app.js"></script>
