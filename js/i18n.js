@@ -1,13 +1,9 @@
 window.LOFT_I18N = {
   languages: [
-    { code: 'en', name: 'English', dir: 'ltr' },
     { code: 'pt', name: 'Português', dir: 'ltr' },
+    { code: 'en', name: 'English', dir: 'ltr' },
     { code: 'es', name: 'Español', dir: 'ltr' },
-    { code: 'fr', name: 'Français', dir: 'ltr' },
-    { code: 'ar', name: 'العربية', dir: 'rtl' },
-    { code: 'zh', name: '中文', dir: 'ltr' },
-    { code: 'hi', name: 'हिन्दी', dir: 'ltr' },
-    { code: 'bn', name: 'বাংলা', dir: 'ltr' }
+    { code: 'ar', name: 'العربية', dir: 'rtl' }
   ],
   strings: {
     en: {
@@ -36,7 +32,7 @@ window.LOFT_I18N = {
       privacyHint: 'Hide Continue watching.', clientId: 'Client ID', redirectIs: 'Redirect URL:', alHint: 'Create at anilist.co.', alNeedId: 'Add ID.', 
       alSignedIn: 'As {n}', alExpired: 'Session expired.', data: 'Data', clearCache: 'Clear cache', cacheCleared: 'Cache cleared.', shortcuts: 'Shortcuts', 
       community: 'Community', version: 'v{v}', saved: 'Saved', maintTitle: 'Tuning the loft', retry: 'Try again',
-      mascotHi: 'Hi, I am Yuki.', tipAdblock: 'Anime Loft has no ads. Use an ad blocker or Brave browser. Join our Discord!', 
+      mascotHi: 'Hi, I am Yuki.', tipAdblock: 'Anime Loft is open source and has no ads. Third-party players may show ads. Use AdBlock or Brave to block them!', 
       tipDiscord: 'Join our Discord community!', tipGithub: 'The project is open source!',
       tip1: 'Press / to search.', tip2: 'Switch servers if black.', tip3: 'Change settings anytime.', tip4: 'Sync your list with AniList.',
       joinDiscord: 'Join Discord', mascotRandom: 'Recommend one',
@@ -79,40 +75,72 @@ window.LOFT_I18N = {
       kArrows: 'Navegar', kNP: 'Próximo/Anterior', anilistStatus: 'Status no AniList'
     },
     es: {
-      skip: 'Saltar al contenido', home: 'Inicio', browse: 'Explorar', myList: 'Mi lista', settings: 'Ajustes', searchPh: 'Buscar anime',
-      mascotHi: 'Hola, soy Yuki.', tipAdblock: 'Anime Loft es de código abierto y no tiene anuncios. Los reproductores de terceros pueden tener anuncios. ¡Usa AdBlock o Brave!',
-      joinDiscord: 'Entrar a Discord', login: 'Iniciar sesión',
-      footNote: 'Anime Loft es un catálogo de código abierto. No alojamos archivos de video; las transmisiones provienen de proveedores externos que pueden contener anuncios.'
-    },
-    fr: {
-      skip: 'Aller au contenu', home: 'Accueil', browse: 'Explorer', myList: 'Ma liste', settings: 'Réglages', searchPh: 'Rechercher un anime',
-      mascotHi: 'Bonjour, je suis Yuki.', tipAdblock: 'Anime Loft est open source et sans publicité. Les lecteurs tiers peuvent afficher des publicités. Utilisez AdBlock ou Brave !',
-      joinDiscord: 'Rejoindre Discord', login: 'Se connecter',
-      footNote: 'Anime Loft est un catalogue open source. Nous n\'hébergeons aucun fichier vidéo ; les flux proviennent de fournisseurs tiers qui peuvent contenir des publicités.'
+      skip: 'Saltar al contenido', home: 'Inicio', browse: 'Explorar', myList: 'Mi lista', settings: 'Ajustes',
+      searchPh: 'Buscar anime', surprise: 'Sorpréndeme', login: 'Iniciar sesión', logout: 'Cerrar sesión', profile: 'Perfil de AniList',
+      seeAll: 'Ver todo', clear: 'Limpiar', continueWatching: 'Continuar viendo', rowTrending: 'Tendencias', rowSeason: 'Populares esta temporada', rowAiring: 'En emisión',
+      rowTop: 'Mejor valorados', rowUpcoming: 'Próxima temporada', rowMovies: 'Películas', watchNow: 'Ver ahora', details: 'Detalles', 
+      episode: 'Episodio', ep: 'Ep', eps: '{n} episodios', min: '{n} min', browseTitle: 'Filtros', year: 'Año', season: 'Temporada', 
+      format: 'Formato', genre: 'Género', sort: 'Ordenar por', any: 'Cualquiera', WINTER: 'Invierno', SPRING: 'Primavera', SUMMER: 'Verano', FALL: 'Otoño', 
+      MOVIE: 'Película', SPECIAL: 'Especial', TV_SHORT: 'Corto', sortPopular: 'Más populares', sortTrending: 'Tendencias', sortScore: 'Mejor valorados', 
+      sortNewest: 'Más recientes', sortFavs: 'Más favoritos', reset: 'Restablecer', loadMore: 'Cargar más', titles: '{n} títulos', noResults: 'No se encontraron títulos.', 
+      searchFor: 'Resultados para "{q}"', searchEmpty: 'Nada encontrado para "{q}".', favorites: 'Favoritos', emptyFavs: 'Toca el corazón para añadir a favoritos.', 
+      emptyContinue: 'Empieza cualquier episodio para continuar aquí.', clearHistory: 'Borrar historial', historyCleared: 'Historial borrado', remove: 'Eliminar', resume: 'Continuar',
+      anilistLists: 'De AniList', synced: 'Sincronizado', syncFail: 'AniList rechazó.', playEp: 'Ver episodio {n}', resumeEp: 'Continuar episodio {n}', 
+      trailer: 'Tráiler', noTrailer: 'Sin tráiler', favAdd: 'Favorito', favRemove: 'Favorito', favAdded: 'Añadido a favoritos', favRemoved: 'Eliminado de favoritos',
+      episodes: 'Episodios', watched: 'visto', nextAiring: 'Episodio {n} sale en {t}', noEpisodes: 'Aún no hay episodios.', related: 'Relacionados', 
+      al_NONE: 'Fuera de la lista', al_CURRENT: 'Viendo', al_PLANNING: 'Planeo ver', al_COMPLETED: 'Completado', al_PAUSED: 'Pausado', al_DROPPED: 'Abandonado', al_REPEATING: 'Reviendo',
+      st_FINISHED: 'Finalizado', st_RELEASING: 'En emisión', st_NOT_YET_RELEASED: 'Próximamente', st_CANCELLED: 'Cancelado', st_HIATUS: 'En pausa',
+      reviews: 'Reseñas', yourRating: 'Tu calificación', commentPh: 'Sin spoilers, por favor.', postReview: 'Publicar reseña', reviewLocal: 'Guardado en el dispositivo', 
+      noReviews: 'Aún no hay reseñas.', reviewSaved: 'Reseña guardada', needStars: 'Elige una calificación.', avgOf: 'promedio de {n} reseñas', del: 'Eliminar', guest: 'Invitado',
+      loadingPlayer: 'Cargando reproductor', playerHint: '¿Pantalla negra? Cambia de servidor.', prev: 'Anterior', next: 'Siguiente', reload: 'Recargar', 
+      openDirect: 'Reproductor directo', switchServer: 'Servidor', noServer: 'Ningún proveedor activo.', serverSkip: '{s} omitido.', lastEp: 'Último episodio.',
+      device: 'Dispositivo', devicePc: 'Computadora', deviceTv: 'TV', deviceMobile: 'Móvil', deviceQ: '¿Qué dispositivo?', deviceSub: 'Adaptamos el diseño.', 
+      theme: 'Tema', themeDark: 'Oscuro', themeOled: 'OLED', themeSky: 'Claro', language: 'Idioma', providers: 'Proveedores', 
+      defaultServer: 'Predeterminado', content: 'Privacidad', nsfw: 'Mostrar 18+', nsfwHint: 'Títulos para adultos.', nsfwConfirm: '¿Tienes 18?', privacy: 'Modo privado', 
+      privacyHint: 'Ocultar Continuar viendo.', clientId: 'ID de cliente', redirectIs: 'URL de redirección:', alHint: 'Crear en anilist.co.', alNeedId: 'Añadir ID.', 
+      alSignedIn: 'Como {n}', alExpired: 'Sesión expirada.', data: 'Tus datos', clearCache: 'Borrar caché', cacheCleared: 'Caché borrada.', shortcuts: 'Atajos', 
+      community: 'Comunidad', version: 'v{v}', saved: 'Guardado', maintTitle: 'Ajustando el Loft', retry: 'Intentar de nuevo',
+      mascotHi: 'Hola, soy Yuki.', tipAdblock: 'Anime Loft es de código abierto y no tiene anuncios. Los reproductores de terceros pueden tener anuncios. ¡Usa AdBlock o Brave!', 
+      tipDiscord: '¡Únete a nuestra comunidad de Discord!', tipGithub: '¡El proyecto es de código abierto!',
+      tip1: 'Presiona / para buscar.', tip2: 'Cambia de servidor si está negro.', tip3: 'Cambia la configuración cuando quieras.', tip4: 'Sincroniza tu lista con AniList.',
+      joinDiscord: 'Entrar a Discord', mascotRandom: 'Recomendar uno',
+      loadErr: 'No se pudo acceder a AniList.', rateLimit: 'AniList está ocupado.', offline: 'Estás offline.', online: 'Conexión restaurada', updateReady: 'Nueva versión lista.', 
+      reloadNow: 'Recargar', footNote: 'Anime Loft es un catálogo de código abierto. No alojamos archivos de video; las transmisiones provienen de proveedores externos que pueden contener anuncios. Datos por AniList.', tagline: 'Cada temporada.|Un Loft tranquilo.', kEsc: 'Cerrar ventana', kF: 'Pantalla completa', kSlash: 'Buscar', 
+      kArrows: 'Navegar', kNP: 'Siguiente/Anterior', anilistStatus: 'Estado en AniList'
     },
     ar: {
-      skip: 'انتقل إلى المحتوى', home: 'الرئيسية', browse: 'تصفح', myList: 'قائمتي', settings: 'الإعدادات', searchPh: 'ابحث عن أنمي',
-      mascotHi: 'مرحبًا، أنا يوكي.', tipAdblock: 'Anime Loft مفتوح المصدر وبدون إعلانات. قد تحتوي مشغلات الطرف الثالث على إعلانات. استخدم AdBlock أو Brave!',
-      joinDiscord: 'انضم إلى Discord', login: 'تسجيل الدخول',
-      footNote: 'Anime Loft هو كتالوج مفتوح المصدر. نحن لا نستضيف ملفات فيديو؛ تأتي عمليات البث من مزودين خارجيين قد تحتوي على إعلانات.'
-    },
-    bn: {
-      skip: 'মূল অংশে যান', home: 'হোম', browse: 'ব্রাউজ', myList: 'আমার তালিকা', settings: 'সেটিংস', searchPh: 'অ্যানিমে খুঁজুন',
-      mascotHi: 'হাই, আমি ইউকি।', tipAdblock: 'Anime Loft ওপেন সোর্স এবং কোনো বিজ্ঞাপন নেই। তৃতীয় পক্ষের প্লেয়ারে বিজ্ঞাপন থাকতে পারে। AdBlock বা Brave ব্যবহার করুন!',
-      joinDiscord: 'Discord এ যোগ দিন', login: 'সাইন ইন',
-      footNote: 'Anime Loft একটি ওপেন সোর্স ক্যাটালগ। আমরা ভিডিও ফাইল হোস্ট করি না; স্ট্রিমগুলি তৃতীয় পক্ষের প্রদানকারীদের কাছ থেকে আসে যাতে বিজ্ঞাপন থাকতে পারে।'
-    },
-    zh: {
-      skip: '跳到内容', home: '首页', browse: '浏览', myList: '我的列表', settings: '设置', searchPh: '搜索动漫',
-      mascotHi: '你好，我是长门有希。', tipAdblock: 'Anime Loft 是开源的且无广告。第三方播放器可能会有广告。请使用 AdBlock 或 Brave！',
-      joinDiscord: '加入 Discord', login: '登录',
-      footNote: 'Anime Loft 是一个开源目录。我们不托管视频文件；流媒体来自可能包含广告的第三方提供商。'
-    },
-    hi: {
-      skip: 'सामग्री पर जाएँ', home: 'होम', browse: 'ब्राउज़', myList: 'मेरी सूची', settings: 'सेटिंग्स', searchPh: 'एनीमे खोजें',
-      mascotHi: 'नमस्ते, मैं युकी हूँ।', tipAdblock: 'Anime Loft ओपन सोर्स है और इसमें कोई विज्ञापन नहीं है। तीसरे पक्ष के प्लेयर में विज्ञापन हो सकते हैं। AdBlock या Brave का उपयोग करें!',
-      joinDiscord: 'Discord से जुड़ें', login: 'साइन इन',
-      footNote: 'Anime Loft एक ओपन सोर्स कैटलॉग है। हम वीडियो फ़ाइलों को होस्ट नहीं करते हैं; स्ट्रीम तीसरे पक्ष के प्रदाताओं से आते हैं जिनमें विज्ञापन हो सकते हैं।'
+      skip: 'انتقل إلى المحتوى', home: 'الرئيسية', browse: 'تصفح', myList: 'قائمتي', settings: 'الإعدادات',
+      searchPh: 'ابحث عن أنمي', surprise: 'فاجئني', login: 'تسجيل الدخول', logout: 'تسجيل الخروج', profile: 'ملف AniList',
+      seeAll: 'عرض الكل', clear: 'مسح', continueWatching: 'متابعة المشاهدة', rowTrending: 'الأكثر رواجاً', rowSeason: 'شائع هذا الموسم', rowAiring: 'يعرض الآن',
+      rowTop: 'الأعلى تقييماً', rowUpcoming: 'الموسم القادم', rowMovies: 'أفلام', watchNow: 'شاهد الآن', details: 'التفاصيل', 
+      episode: 'حلقة', ep: 'ح', eps: '{n} حلقات', min: '{n} دقيقة', browseTitle: 'الفلاتر', year: 'السنة', season: 'الموسم', 
+      format: 'الصيغة', genre: 'التصنيف', sort: 'ترتيب حسب', any: 'أي', WINTER: 'الشتاء', SPRING: 'الربيع', SUMMER: 'الصيف', FALL: 'الخريف', 
+      MOVIE: 'فيلم', SPECIAL: 'خاص', TV_SHORT: 'قصير', sortPopular: 'الأكثر شعبية', sortTrending: 'رواج', sortScore: 'الأعلى تقييماً', 
+      sortNewest: 'الأحدث', sortFavs: 'الأكثر مفضلة', reset: 'إعادة تعيين', loadMore: 'تحميل المزيد', titles: '{n} عناوين', noResults: 'لم يتم العثور على عناوين.', 
+      searchFor: 'نتائج لـ "{q}"', searchEmpty: 'لم يتم العثور على شيء لـ "{q}".', favorites: 'المفضلة', emptyFavs: 'اضغط على القلب لإضافة مفضلة.', 
+      emptyContinue: 'ابدأ أي حلقة للاستمرار هنا.', clearHistory: 'مسح السجل', historyCleared: 'تم مسح السجل', remove: 'إزالة', resume: 'استئناف',
+      anilistLists: 'من AniList', synced: 'متزامن', syncFail: 'رفض AniList.', playEp: 'تشغيل الحلقة {n}', resumeEp: 'استئناف الحلقة {n}', 
+      trailer: 'إعلان', noTrailer: 'لا يوجد إعلان', favAdd: 'مفضل', favRemove: 'في المفضلة', favAdded: 'أضيف إلى المفضلة', favRemoved: 'أزيل من المفضلة',
+      episodes: 'حلقات', watched: 'تمت مشاهدته', nextAiring: 'الحلقة {n} تعرض في {t}', noEpisodes: 'لم تصدر حلقات بعد.', related: 'ذات صلة', 
+      al_NONE: 'ليس في القائمة', al_CURRENT: 'أشاهد', al_PLANNING: 'أخطط للمشاهدة', al_COMPLETED: 'مكتمل', al_PAUSED: 'متوقف مؤقتاً', al_DROPPED: 'متروك', al_REPEATING: 'أعيد المشاهدة',
+      st_FINISHED: 'انتهى', st_RELEASING: 'يعرض', st_NOT_YET_RELEASED: 'قريباً', st_CANCELLED: 'ملغى', st_HIATUS: 'متوقف',
+      reviews: 'مراجعات', yourRating: 'تقييمك', commentPh: 'بدون حرق، من فضلك.', postReview: 'نشر المراجعة', reviewLocal: 'محفوظ على الجهاز', 
+      noReviews: 'لا توجد مراجعات بعد.', reviewSaved: 'تم حفظ المراجعة', needStars: 'اختر تقييماً بالنجوم.', avgOf: 'متوسط {n} مراجعات', del: 'حذف', guest: 'زائر',
+      loadingPlayer: 'جاري تحميل المشغل', playerHint: 'شاشة سوداء؟ غير السيرفر.', prev: 'السابق', next: 'التالي', reload: 'إعادة تحميل', 
+      openDirect: 'المشغل المباشر', switchServer: 'سيرفر', noServer: 'لا يوجد مزود مفعل.', serverSkip: 'تم تخطي {s}.', lastEp: 'آخر حلقة.',
+      device: 'الجهاز', devicePc: 'كمبيوتر', deviceTv: 'تلفاز', deviceMobile: 'جوال', deviceQ: 'ما هو جهازك؟', deviceSub: 'نحن نكيف التصميم.', 
+      theme: 'المظهر', themeDark: 'داكن', themeOled: 'أسود OLED', themeSky: 'فاتح', language: 'اللغة', providers: 'المزودون', 
+      defaultServer: 'افتراضي', content: 'الخصوصية', nsfw: 'إظهار +18', nsfwHint: 'عناوين للبالغين.', nsfwConfirm: 'هل عمرك 18؟', privacy: 'وضع الخصوصية', 
+      privacyHint: 'إخفاء متابعة المشاهدة.', clientId: 'معرف العميل', redirectIs: 'رابط إعادة التوجيه:', alHint: 'أنشئ في anilist.co.', alNeedId: 'أضف المعرف.', 
+      alSignedIn: 'كـ {n}', alExpired: 'انتهت الجلسة.', data: 'بياناتك', clearCache: 'مسح الكاش', cacheCleared: 'تم مسح الكاش.', shortcuts: 'الاختصارات', 
+      community: 'المجتمع', version: 'v{v}', saved: 'تم الحفظ', maintTitle: 'نقوم بتحسين الموقع', retry: 'حاول مرة أخرى',
+      mascotHi: 'مرحبًا، أنا يوكي.', tipAdblock: 'Anime Loft مفتوح المصدر وبدون إعلانات. قد تحتوي مشغلات الطرف الثالث على إعلانات. استخدم AdBlock أو Brave!', 
+      tipDiscord: 'انضم إلى مجتمعنا على Discord!', tipGithub: 'المشروع مفتوح المصدر!',
+      tip1: 'اضغط / للبحث.', tip2: 'غير السيرفر إذا كانت الشاشة سوداء.', tip3: 'غير الإعدادات في أي وقت.', tip4: 'زامن قائمتك مع AniList.',
+      joinDiscord: 'انضم إلى Discord', mascotRandom: 'اقترح واحداً',
+      loadErr: 'تعذر الوصول إلى AniList.', rateLimit: 'AniList مشغول.', offline: 'أنت غير متصل.', online: 'عاد الاتصال', updateReady: 'نسخة جديدة جاهزة.', 
+      reloadNow: 'إعادة تحميل', footNote: 'Anime Loft هو كتالوج مفتوح المصدر. نحن لا نستضيف ملفات فيديو؛ تأتي عمليات البث من مزودين خارجيين قد تحتوي على إعلانات. البيانات من AniList.', tagline: 'كل موسم.|لوفت هادئ.', kEsc: 'إغلاق النافذة', kF: 'ملء الشاشة', kSlash: 'بحث', 
+      kArrows: 'تنقل', kNP: 'التالي/السابق', anilistStatus: 'حالة AniList'
     }
   }
 };
