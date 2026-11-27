@@ -1,13 +1,13 @@
 window.LOFT_I18N = {
   languages: [
     { code: 'en', name: 'English', dir: 'ltr' },
-    { code: 'zh', name: '中文', dir: 'ltr' },
-    { code: 'hi', name: 'हिन्दी', dir: 'ltr' },
+    { code: 'pt', name: 'Português', dir: 'ltr' },
     { code: 'es', name: 'Español', dir: 'ltr' },
     { code: 'fr', name: 'Français', dir: 'ltr' },
     { code: 'ar', name: 'العربية', dir: 'rtl' },
-    { code: 'bn', name: 'বাংলা', dir: 'ltr' },
-    { code: 'pt', name: 'Português', dir: 'ltr' }
+    { code: 'zh', name: '中文', dir: 'ltr' },
+    { code: 'hi', name: 'हिन्दी', dir: 'ltr' },
+    { code: 'bn', name: 'বাংলা', dir: 'ltr' }
   ],
   strings: {
     en: {
@@ -41,8 +41,8 @@ window.LOFT_I18N = {
       tip1: 'Press / to search.', tip2: 'Switch servers if black.', tip3: 'Change settings anytime.', tip4: 'Sync your list with AniList.',
       joinDiscord: 'Join Discord', mascotRandom: 'Recommend one',
       loadErr: 'Could not reach AniList.', rateLimit: 'AniList is busy.', offline: 'You are offline.', online: 'Back online', updateReady: 'New version ready.', 
-      reloadNow: 'Reload', footNote: 'Open source.', tagline: 'Every season.|One quiet Loft.', kEsc: 'Close window', kF: 'Fullscreen', kSlash: 'Search', 
-      kArrows: 'Navigate', kNP: 'Next/Prev episode'
+      reloadNow: 'Reload', footNote: 'Anime Loft is an open source catalog. It hosts no video files; streams come from third party providers that may contain ads. Catalog data by AniList.', tagline: 'Every season.|One quiet Loft.', kEsc: 'Close window', kF: 'Fullscreen', kSlash: 'Search', 
+      kArrows: 'Navigate', kNP: 'Next/Prev episode', anilistStatus: 'AniList status'
     },
     pt: {
       skip: 'Pular para o conteúdo', home: 'Início', browse: 'Explorar', myList: 'Minha lista', settings: 'Configurações',
@@ -70,43 +70,49 @@ window.LOFT_I18N = {
       privacyHint: 'Esconder Continuar assistindo.', clientId: 'ID do Cliente', redirectIs: 'URL de redirecionamento:', alHint: 'Crie em anilist.co.', alNeedId: 'Adicione o ID.', 
       alSignedIn: 'Como {n}', alExpired: 'Sessão expirada.', data: 'Seus dados', clearCache: 'Limpar cache', cacheCleared: 'Cache limpo.', shortcuts: 'Atalhos', 
       community: 'Comunidade', version: 'v{v}', saved: 'Salvo', maintTitle: 'Ajustando o Loft', retry: 'Tentar de novo',
-      mascotHi: 'Oi, eu sou a Yuki.', tipAdblock: 'O Anime Loft não tem anúncios. Use um Adblock ou o navegador Brave. Entre no nosso Discord!', 
+      mascotHi: 'Oi, eu sou a Yuki.', tipAdblock: 'O Anime Loft é open source e não tem anúncios. Os players de terceiros podem exibir ads. Use AdBlock ou Brave para bloquear!', 
       tipDiscord: 'Junte-se à nossa comunidade no Discord!', tipGithub: 'O código do projeto é aberto!',
       tip1: 'Aperte / para buscar.', tip2: 'Troque de servidor se ficar preto.', tip3: 'Mude as configurações quando quiser.', tip4: 'Sincronize sua lista com o AniList.',
       joinDiscord: 'Entrar no Discord', mascotRandom: 'Recomende um',
       loadErr: 'Erro ao acessar o AniList.', rateLimit: 'AniList ocupado.', offline: 'Você está offline.', online: 'Conexão de volta', updateReady: 'Nova versão pronta.', 
-      reloadNow: 'Recarregar', footNote: 'Código aberto.', tagline: 'Cada temporada.|Um Loft tranquilo.', kEsc: 'Fechar janela', kF: 'Tela cheia', kSlash: 'Buscar', 
-      kArrows: 'Navegar', kNP: 'Próximo/Anterior'
+      reloadNow: 'Recarregar', footNote: 'O Anime Loft é um catálogo de código aberto. Não hospedamos arquivos; os streams vêm de provedores terceiros que podem exibir anúncios. Dados por AniList.', tagline: 'Cada temporada.|Um Loft tranquilo.', kEsc: 'Fechar janela', kF: 'Tela cheia', kSlash: 'Buscar', 
+      kArrows: 'Navegar', kNP: 'Próximo/Anterior', anilistStatus: 'Status no AniList'
     },
     es: {
       skip: 'Saltar al contenido', home: 'Inicio', browse: 'Explorar', myList: 'Mi lista', settings: 'Ajustes', searchPh: 'Buscar anime',
-      mascotHi: 'Hola, soy Yuki.', tipAdblock: 'Anime Loft no tiene anuncios. Usa un bloqueador o Brave. ¡Únete a nuestro Discord!',
-      joinDiscord: 'Entrar a Discord', login: 'Iniciar sesión'
+      mascotHi: 'Hola, soy Yuki.', tipAdblock: 'Anime Loft es de código abierto y no tiene anuncios. Los reproductores de terceros pueden tener anuncios. ¡Usa AdBlock o Brave!',
+      joinDiscord: 'Entrar a Discord', login: 'Iniciar sesión',
+      footNote: 'Anime Loft es un catálogo de código abierto. No alojamos archivos de video; las transmisiones provienen de proveedores externos que pueden contener anuncios.'
     },
     fr: {
       skip: 'Aller au contenu', home: 'Accueil', browse: 'Explorer', myList: 'Ma liste', settings: 'Réglages', searchPh: 'Rechercher un anime',
-      mascotHi: 'Bonjour, je suis Yuki.', tipAdblock: 'Anime Loft est sans publicité. Utilisez un bloqueur ou Brave. Rejoignez notre Discord !',
-      joinDiscord: 'Rejoindre Discord', login: 'Se connecter'
+      mascotHi: 'Bonjour, je suis Yuki.', tipAdblock: 'Anime Loft est open source et sans publicité. Les lecteurs tiers peuvent afficher des publicités. Utilisez AdBlock ou Brave !',
+      joinDiscord: 'Rejoindre Discord', login: 'Se connecter',
+      footNote: 'Anime Loft est un catalogue open source. Nous n\'hébergeons aucun fichier vidéo ; les flux proviennent de fournisseurs tiers qui peuvent contenir des publicités.'
     },
     ar: {
       skip: 'انتقل إلى المحتوى', home: 'الرئيسية', browse: 'تصفح', myList: 'قائمتي', settings: 'الإعدادات', searchPh: 'ابحث عن أنمي',
-      mascotHi: 'مرحبًا، أنا يوكي.', tipAdblock: 'Anime Loft بدون إعلانات. استخدم مانع إعلانات أو Brave. انضم إلى Discord!',
-      joinDiscord: 'انضم إلى Discord', login: 'تسجيل الدخول'
+      mascotHi: 'مرحبًا، أنا يوكي.', tipAdblock: 'Anime Loft مفتوح المصدر وبدون إعلانات. قد تحتوي مشغلات الطرف الثالث على إعلانات. استخدم AdBlock أو Brave!',
+      joinDiscord: 'انضم إلى Discord', login: 'تسجيل الدخول',
+      footNote: 'Anime Loft هو كتالوج مفتوح المصدر. نحن لا نستضيف ملفات فيديو؛ تأتي عمليات البث من مزودين خارجيين قد تحتوي على إعلانات.'
     },
     bn: {
       skip: 'মূল অংশে যান', home: 'হোম', browse: 'ব্রাউজ', myList: 'আমার তালিকা', settings: 'সেটিংস', searchPh: 'অ্যানিমে খুঁজুন',
-      mascotHi: 'হাই, আমি ইউকি।', tipAdblock: 'Anime Loft এ কোনো বিজ্ঞাপন নেই। অ্যাড ব্লকার বা Brave ব্যবহার করুন। Discord এ যোগ দিন!',
-      joinDiscord: 'Discord এ যোগ দিন', login: 'সাইন ইন'
+      mascotHi: 'হাই, আমি ইউকি।', tipAdblock: 'Anime Loft ওপেন সোর্স এবং কোনো বিজ্ঞাপন নেই। তৃতীয় পক্ষের প্লেয়ারে বিজ্ঞাপন থাকতে পারে। AdBlock বা Brave ব্যবহার করুন!',
+      joinDiscord: 'Discord এ যোগ দিন', login: 'সাইন ইন',
+      footNote: 'Anime Loft একটি ওপেন সোর্স ক্যাটালগ। আমরা ভিডিও ফাইল হোস্ট করি না; স্ট্রিমগুলি তৃতীয় পক্ষের প্রদানকারীদের কাছ থেকে আসে যাতে বিজ্ঞাপন থাকতে পারে।'
     },
     zh: {
       skip: '跳到内容', home: '首页', browse: '浏览', myList: '我的列表', settings: '设置', searchPh: '搜索动漫',
-      mascotHi: '你好，我是长门有希。', tipAdblock: 'Anime Loft 无广告。请使用广告拦截器或 Brave 浏览器。加入我们的 Discord！',
-      joinDiscord: '加入 Discord', login: '登录'
+      mascotHi: '你好，我是长门有希。', tipAdblock: 'Anime Loft 是开源的且无广告。第三方播放器可能会有广告。请使用 AdBlock 或 Brave！',
+      joinDiscord: '加入 Discord', login: '登录',
+      footNote: 'Anime Loft 是一个开源目录。我们不托管视频文件；流媒体来自可能包含广告的第三方提供商。'
     },
     hi: {
       skip: 'सामग्री पर जाएँ', home: 'होम', browse: 'ब्राउज़', myList: 'मेरी सूची', settings: 'सेटिंग्स', searchPh: 'एनीमे खोजें',
-      mascotHi: 'नमस्ते, मैं युकी हूँ।', tipAdblock: 'Anime Loft में कोई विज्ञापन नहीं है। ऐड ब्लॉकर या Brave का उपयोग करें। हमारे Discord से जुड़ें!',
-      joinDiscord: 'Discord से जुड़ें', login: 'साइन इन'
+      mascotHi: 'नमस्ते, मैं युकी हूँ।', tipAdblock: 'Anime Loft ओपन सोर्स है और इसमें कोई विज्ञापन नहीं है। तीसरे पक्ष के प्लेयर में विज्ञापन हो सकते हैं। AdBlock या Brave का उपयोग करें!',
+      joinDiscord: 'Discord से जुड़ें', login: 'साइन इन',
+      footNote: 'Anime Loft एक ओपन सोर्स कैटलॉग है। हम वीडियो फ़ाइलों को होस्ट नहीं करते हैं; स्ट्रीम तीसरे पक्ष के प्रदाताओं से आते हैं जिनमें विज्ञापन हो सकते हैं।'
     }
   }
 };
