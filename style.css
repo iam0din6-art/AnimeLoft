@@ -133,3 +133,10 @@ select.field { appearance: none; padding-inline-end: var(--s-400); background-im
 .open-source-banner { display: flex; align-items: center; gap: var(--s-100); background: rgba(255,255,255,0.05); padding: var(--s-100) var(--s-200); border-radius: var(--r-xl); border: 1px solid rgba(255,255,255,0.1); max-width: 700px; }
 .open-source-banner i { color: var(--coral); font-size: 1.5rem; }
 .open-source-banner a { color: var(--sky-300); text-decoration: underline; font-weight: 600; }
+/* Correções Finais */
+.skip-link { display: none !important; }
+.hero .empty { 
+  height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; 
+  background: var(--bg); color: var(--muted); text-align: center; 
+}
+.hero .empty i { font-size: 4rem; color: var(--coral); margin-bottom: 16px; }
