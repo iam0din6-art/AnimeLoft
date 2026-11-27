@@ -9,7 +9,16 @@ const EMBED_TIMEOUT_MS = 15000;
 const HERO_INTERVAL = 8000;
 const CONFIG = Object.assign({ anilistClientId: '', rateMax: 24, rateWindowMs: 60000 }, window.LOFT_CONFIG || {});
 const K = { device: 'loft_device_mode', theme: 'loft_theme', lang: 'loft_lang', nsfw: 'loft_nsfw', privacy: 'loft_privacy', servers: 'loft_servers', audio: 'loft_audio', favs: 'loft_favs', cont: 'loft_continue', watched: 'loft_watched', reviews: 'loft_reviews_', token: 'loft_anilist_token', tokenExp: 'loft_anilist_token_exp', clientId: 'loft_anilist_client', mascot: 'loft_mascot_min', serversCache: 'loft_servers_cache' };
-const DEFAULT_SERVERS = { version: 2, maintenance: false, message: { en: 'We are improving Anime Loft.' }, servers: [{ id: 'megaplay', label: 'MegaPlay', type: 'embed', enabled: true, url: 'https://megaplay.buzz/stream/ani/{anilistId}/{ep}/{audio}' }] };
+const DEFAULT_SERVERS = { 
+  version: 2, 
+  maintenance: false, 
+  message: { en: 'We are improving Anime Loft.' }, 
+  servers: [
+    { id: 'megaplay', label: 'MegaPlay', type: 'embed', enabled: true, url: 'https://megaplay.buzz/stream/ani/{anilistId}/{ep}/{audio}' },
+    // Adicionado servidor com suporte a conteúdo adulto (+18)
+    { id: 'hanime', label: 'HAnime (+18)', type: 'embed', enabled: true, adult: true, url: 'https://hanime.tv/videos/hentai/{anilistId}' }
+  ] 
+};
 const GENRES_FALLBACK = ['Action', 'Adventure', 'Comedy', 'Drama', 'Ecchi', 'Fantasy', 'Horror', 'Mahou Shoujo', 'Mecha', 'Music', 'Mystery', 'Psychological', 'Romance', 'Sci-Fi', 'Slice of Life', 'Sports', 'Supernatural', 'Thriller'];
 const QUICK_GENRES = ['Action', 'Romance', 'Comedy', 'Fantasy', 'Sci-Fi', 'Slice of Life', 'Mystery', 'Sports', 'Psychological', 'Supernatural'];
 const $ = (id) => document.getElementById(id);
@@ -241,7 +250,19 @@ function paintStarInput() { const box = qsa('.stars-input')[0]; if (!box) return
 function renderReviews(m) { if (state.reviewFor !== m.id) { state.reviewFor = m.id; state.pendingStars = 0; $('review-text').value = ''; $('review-err').hidden = true; } paintStarInput(); const list = getReviews(m.id); const avg = list.length ? list.reduce((s, r) => s + (Number(r.stars) || 0), 0) / list.length : 0; $('review-summary').innerHTML = list.length ? `<strong>${avg.toFixed(1)}</strong><span class="stars" style="color:var(--sun)">${starsText(avg)}</span><span>${esc(t('avgOf', { n: list.length }))}</span>` : `<span>${esc(t('noReviews'))}</span>`; $('review-list').innerHTML = list.map((r, i) => { const date = new Date(r.at || Date.now()).toLocaleDateString(state.lang); return `<li class="review"><div class="review-top"><strong>${esc(r.name || t('guest'))}</strong><span class="stars">${starsText(r.stars)}</span></div>${r.text ? `<p>${esc(r.text)}</p>` : ''}<div class="review-top"><span class="caption-5 muted">${esc(date)}</span><button type="button" class="review-del" data-del-review="${i}">${esc(t('del'))}</button></div></li>`; }).join(''); }
 function submitReview(e) { e.preventDefault(); const m = state.detail; if (!m) return; const err = $('review-err'); if (!state.pendingStars) { err.textContent = t('needStars'); err.hidden = false; return; } err.hidden = true; const list = getReviews(m.id); list.unshift({ name: state.viewer ? state.viewer.name : null, avatar: state.viewer ? state.viewer.avatar : '', stars: state.pendingStars, text: $('review-text').value.trim().slice(0, 600), at: Date.now() }); lsSetJSON(K.reviews + m.id, list.slice(0, 100)); state.pendingStars = 0; $('review-text').value = ''; renderReviews(m); toast(t('reviewSaved'), { type: 'ok' }); }
 
-function orderedServers() { const prefs = state.prefs; const list = state.config.servers.filter((s) => s.type === 'embed' && s.enabled !== false && prefs.enabled[s.id] !== false); const i = prefs.default ? list.findIndex((s) => s.id === prefs.default) : -1; if (i > 0) list.unshift(list.splice(i, 1)[0]); return list; }
+function orderedServers(isAdult = false) {
+  const prefs = state.prefs;
+  // Filtra os servidores: se for +18, só mostra os que aceitam adulto. Se não, só os normais.
+  const list = state.config.servers.filter((s) => 
+    s.type === 'embed' && 
+    s.enabled !== false && 
+    prefs.enabled[s.id] !== false &&
+    (isAdult ? s.adult === true : s.adult !== true)
+  );
+  const i = prefs.default ? list.findIndex((s) => s.id === prefs.default) : -1;
+  if (i > 0) list.unshift(list.splice(i, 1)[0]);
+  return list;
+}
 function embedUrl(server, anime, ep, audio) { const ctx = { anilistId: anime.id, malId: anime.idMal, ep, audio, dub: audio === 'dub' ? 1 : 0 }; let missing = false; const url = String(server.url || '').replace(/\{(\w+)\}/g, (_, k) => { const v = ctx[k]; if (v == null || v === '') { missing = true; return ''; } return encodeURIComponent(v); }); return missing || !/^https?:\/\//.test(url) ? null : url; }
 function playableEpisode(m, wanted) { const released = releasedEpisodes(m); return Math.min(Math.max(1, wanted || 1), Math.max(1, released)); }
 async function playAnime(id) { try { const m = await getMedia(id); if (releasedEpisodes(m) < 1) { toast(t('noEpisodes')); openDetail(id); return; } const c = getContinue()[id]; openPlayer(m, playableEpisode(m, c ? c.ep : 1)); } catch (e) { toast(t('loadErr'), { type: 'error' }); } }
