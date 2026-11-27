@@ -1,172 +1,87 @@
-'use strict';
-const APP_VERSION = '2.0.0';
-const ANILIST_API = 'https://graphql.anilist.co';
-const GITHUB_URL = 'https://github.com/iam0din6-art/AnimeLoft';
-const DISCORD_URL = 'https://discord.gg/3qeKkseWSs';
-const SERVERS_URL = 'servers.json';
-const QUERY_TTL = 15 * 60 * 1000;
-const EMBED_TIMEOUT_MS = 15000;
-const HERO_INTERVAL = 8000;
-
-const CONFIG = Object.assign({ anilistClientId: '', rateMax: 24, rateWindowMs: 60000 }, window.LOFT_CONFIG || {});
-const K = { device: 'loft_device_mode', theme: 'loft_theme', lang: 'loft_lang', nsfw: 'loft_nsfw', privacy: 'loft_privacy', servers: 'loft_servers', audio: 'loft_audio', favs: 'loft_favs', cont: 'loft_continue', watched: 'loft_watched', reviews: 'loft_reviews_', token: 'loft_anilist_token', tokenExp: 'loft_anilist_token_exp', clientId: 'loft_anilist_client', mascot: 'loft_mascot_min', serversCache: 'loft_servers_cache' };
-
-const DEFAULT_SERVERS = { version: 2, maintenance: false, servers: [{ id: 'megaplay', label: 'MegaPlay', type: 'embed', enabled: true, url: 'https://megaplay.buzz/stream/ani/{anilistId}/{ep}/{audio}' }] };
-const GENRES_FALLBACK = ['Action', 'Adventure', 'Comedy', 'Drama', 'Fantasy', 'Horror', 'Mystery', 'Romance', 'Sci-Fi', 'Slice of Life'];
-
-const $ = (id) => document.getElementById(id);
-const qsa = (sel, root = document) => Array.from(root.querySelectorAll(sel));
-
-function lsGet(key, fallback = null) { try { const v = localStorage.getItem(key); return v === null ? fallback : v; } catch (e) { return fallback; } }
-function lsSet(key, value) { try { localStorage.setItem(key, value); } catch (e) {} }
-function lsDel(key) { try { localStorage.removeItem(key); } catch (e) {} }
-function lsJSON(key, fallback) { try { const v = localStorage.getItem(key); if (!v) return fallback; return JSON.parse(v); } catch (e) { return fallback; } }
-function lsSetJSON(key, value) { lsSet(key, JSON.stringify(value)); }
-function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
-function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
-function hashStr(s) { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36); }
-
-const I18N = window.LOFT_I18N || { strings: { pt: {} } };
-function t(key, vars) { const dict = I18N.strings[state.lang] || I18N.strings.pt || {}; let s = dict[key] || key; if (vars) s = s.replace(/\{(\w+)\}/g, (_, k) => (vars[k] != null ? vars[k] : '')); return s; }
-
-const state = { lang: 'pt', device: lsGet(K.device), theme: lsGet(K.theme, 'dark'), nsfw: lsGet(K.nsfw) === '1', privacy: lsGet(K.privacy) === '1', config: DEFAULT_SERVERS, prefs: lsJSON(K.servers, { enabled: {}, default: '' }), media: new Map(), detail: null, view: 'home', browse: { page: 1 }, stack: [], genres: GENRES_FALLBACK };
-
-function toast(msg, { type = 'info', ms = 4200 } = {}) {
-  const box = $('toasts'); if (!box) return;
-  const el = document.createElement('div'); el.className = `toast ${type}`; el.innerHTML = `<span>${esc(msg)}</span>`;
-  box.appendChild(el); setTimeout(() => el.remove(), ms);
-}
-
-const MEDIA_FIELDS = `id idMal type title { romaji english native userPreferred } coverImage { extraLarge large color } bannerImage format status episodes duration season seasonYear averageScore popularity genres isAdult startDate { year } nextAiringEpisode { episode airingAt timeUntilAiring }`;
-function adultVar() { return state.nsfw ? undefined : false; }
-
-async function gql(query, variables = {}, { auth = false, cache = true } = {}) {
-  const headers = { 'Content-Type': 'application/json' }; if (auth && state.token) headers.Authorization = `Bearer ${state.token}`;
-  const key = 'loft_q_' + hashStr(query + JSON.stringify(variables));
-  if (cache) { try { const hit = JSON.parse(sessionStorage.getItem(key) || 'null'); if (hit && Date.now() - hit.at < QUERY_TTL) return hit.data; } catch (e) {} }
-  const res = await fetch(ANILIST_API, { method: 'POST', headers, body: JSON.stringify({ query, variables }) });
-  const json = await res.json();
-  if (!res.ok || json.errors) throw new Error('API Error');
-  if (cache) { try { sessionStorage.setItem(key, JSON.stringify({ at: Date.now(), data: json.data })); } catch (e) {} }
-  return json.data;
-}
-
-function remember(list) { (list || []).forEach((m) => { if (m && m.id) state.media.set(m.id, Object.assign(state.media.get(m.id) || {}, m)); }); return list || []; }
-function titleOf(m) { if (!m) return ''; const tt = m.title || {}; return tt.english || tt.userPreferred || tt.romaji || tt.native || ''; }
-function coverOf(m) { return (m.coverImage && (m.coverImage.extraLarge || m.coverImage.large)) || ''; }
-
-function cardHTML(m) {
-  const title = titleOf(m);
-  const score = m.averageScore ? `<span class="badge badge-score">★ ${(m.averageScore / 10).toFixed(1)}</span>` : '';
-  return `<button type="button" class="card" data-open="${m.id}"><div class="card-poster"><div class="card-badges">${score}</div><img src="${esc(coverOf(m))}" loading="lazy"><div class="card-play"><span><i class="ph-fill ph-play"></i></span></div></div><span class="card-title clamp-2">${esc(title)}</span><span class="card-sub">${m.format} · ${m.seasonYear || ''}</span></button>`;
-}
-function skeletonCards(n = 8) { return Array.from({ length: n }, () => '<div class="skel-card"><div class="skeleton"></div><div class="skeleton skel-line"></div></div>').join(''); }
-function emptyHTML(icon, text) { return `<div class="empty"><i class="ph ${icon} big"></i><p class="body-6 muted">${esc(text)}</p></div>`; }
-
-function parseHash() { const h = location.hash.replace(/^#\/?/, ''); const [path, query = ''] = h.split('?'); return { path: path || 'home', params: new URLSearchParams(query) }; }
-function route() {
-  const { path, params } = parseHash();
-  const view = ['home', 'browse', 'list', 'search'].includes(path) ? path : 'home';
-  showView(view);
-  if (view === 'home') loadHome();
-  if (view === 'browse') loadBrowse();
-  if (view === 'list') renderList();
-  if (view === 'search') runSearch(params.get('q') || '');
-}
-function showView(view) {
-  state.view = view;
-  qsa('[data-view-panel]').forEach((p) => { p.hidden = p.dataset.viewPanel !== view; });
-  qsa('[data-view]').forEach((a) => { if (a.dataset.view === view) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
-}
-
-const HOME_QUERY = `query($season: MediaSeason, $year: Int, $adult: Boolean) { trending: Page(perPage: 20) { media(type: ANIME, sort: TRENDING_DESC, isAdult: $adult) { ${MEDIA_FIELDS} } } }`;
-async function loadHome() {
-  const cur = new Date(); const season = ['WINTER', 'SPRING', 'SUMMER', 'FALL'][Math.floor(cur.getMonth() / 3)];
-  const vars = { season, year: cur.getFullYear() }; const adult = adultVar(); if (adult !== undefined) vars.adult = adult;
-  $('hero').innerHTML = '<div class="skeleton" style="height:400px"></div>'; $('home-rows').innerHTML = skeletonCards(6);
-  try {
-    const data = await gql(HOME_QUERY, vars);
-    const list = remember(data.trending.media);
-    if (list.length) {
-      const m = list[0];
-      $('hero').innerHTML = `<div class="hero-stage"><img src="${esc(m.bannerImage || coverOf(m))}"><div class="hero-copy"><h2>${esc(titleOf(m))}</h2><button class="btn btn-primary" data-play="${m.id}">Assistir</button></div></div>`;
-    }
-    $('home-rows').innerHTML = list.map(cardHTML).join('');
-  } catch (e) { $('home-rows').innerHTML = emptyHTML('ph-warning', 'Erro ao carregar'); }
-}
-
-const BROWSE_QUERY = `query($page: Int, $season: MediaSeason, $seasonYear: Int, $format: MediaFormat, $genre: String, $sort: [MediaSort], $adult: Boolean) { Page(page: $page, perPage: 30) { pageInfo { hasNextPage } media(type: ANIME, season: $season, seasonYear: $seasonYear, format: $format, genre: $genre, sort: $sort, isAdult: $adult) { ${MEDIA_FIELDS} } } }`;
-async function loadBrowse() {
-  const vars = { page: 1, sort: [$('f-sort').value || 'POPULARITY_DESC'] };
-  const adult = adultVar(); if (adult !== undefined) vars.adult = adult;
-  const season = $('f-season').value; if (season) vars.season = season;
-  const year = Number($('f-year').value); if (year) vars.seasonYear = year;
-  const format = $('f-format').value; if (format) vars.format = format;
-  const genre = $('f-genre').value; if (genre) vars.genre = genre;
-
-  $('browse-grid').innerHTML = skeletonCards(12);
-  try {
-    const data = await gql(BROWSE_QUERY, vars);
-    const list = remember(data.Page.media);
-    $('browse-grid').innerHTML = list.length ? list.map(cardHTML).join('') : emptyHTML('ph-magnifying-glass', 'Nenhum anime encontrado');
-  } catch (e) { $('browse-grid').innerHTML = emptyHTML('ph-warning', 'Erro'); }
-}
-
-const SEARCH_QUERY = `query($q: String, $adult: Boolean) { Page(perPage: 40) { media(type: ANIME, search: $q, sort: SEARCH_MATCH, isAdult: $adult) { ${MEDIA_FIELDS} } } }`;
-async function runSearch(q) {
-  q = q.trim(); $('search-h').textContent = `Resultados para "${q}"`;
-  const grid = $('search-grid'); if (!q) { grid.innerHTML = emptyHTML('ph-magnifying-glass', 'Buscar anime'); return; }
-  grid.innerHTML = skeletonCards(12);
-  const vars = { q }; const adult = adultVar(); if (adult !== undefined) vars.adult = adult;
-  try {
-    const data = await gql(SEARCH_QUERY, vars);
-    const list = remember(data.Page.media);
-    grid.innerHTML = list.length ? list.map(cardHTML).join('') : emptyHTML('ph-ghost', `Nada encontrado para "${q}"`);
-  } catch (e) { grid.innerHTML = emptyHTML('ph-warning', 'Erro na busca'); }
-}
-
-function renderList() {
-  const cont = Object.values(lsJSON(K.cont, {})).sort((a, b) => b.updated - a.updated);
-  $('list-continue').innerHTML = cont.length ? cont.map((c) => `<div class="cw-card"><img src="${c.cover}" width="80"><div><strong>${esc(c.title)}</strong><p>Episódio ${c.ep}</p></div></div>`).join('') : emptyHTML('ph-play-circle', 'Nada aqui');
-  const favs = lsJSON(K.favs, []);
-  $('list-favs').innerHTML = favs.length ? favs.map(cardHTML).join('') : emptyHTML('ph-heart', 'Nada aqui');
-}
-
-async function openDetail(id) {
-  const m = state.media.get(id); if (!m) return; state.detail = m;
-  const el = $('detail'); el.hidden = false; document.body.classList.add('locked');
-  $('d-title').textContent = titleOf(m);
-  $('d-cover').src = coverOf(m);
-  $('d-desc').textContent = m.description || 'Sem descrição.';
-  $('d-play').onclick = () => { el.hidden = true; document.body.classList.remove('locked'); playAnime(m.id); };
-}
-function closeLayer() { qsa('.layer').forEach(l => l.hidden = true); document.body.classList.remove('locked'); }
-
-async function playAnime(id) {
-  toast('Abrindo player...');
-  try {
-    const data = await gql(`query($id: Int) { Media(id: $id) { id } }`, { id });
-    const server = DEFAULT_SERVERS.servers[0].url.replace('{anilistId}', id).replace('{ep}', 1).replace('{audio}', 'sub');
-    window.open(server, '_blank');
-  } catch (e) { toast('Erro'); }
-}
-
-function bindEvents() {
-  document.addEventListener('click', (e) => {
-    const open = e.target.closest('[data-open]'); if (open) { openDetail(Number(open.dataset.open)); return; }
-    const play = e.target.closest('[data-play]'); if (play) { playAnime(Number(play.dataset.play)); return; }
-    const close = e.target.closest('[data-close]'); if (close) { closeLayer(); return; }
-  });
-  window.addEventListener('hashchange', route);
-  if ($('filters')) $('filters').addEventListener('change', debounce(loadBrowse, 300));
-  const input = $('search-input');
-  if(input) input.addEventListener('keydown', (e) => { if (e.key === 'Enter') location.hash = '#/search?q=' + encodeURIComponent(e.target.value); });
-}
-
-function initApp() {
-  qsa('[data-github]').forEach((a) => { a.href = GITHUB_URL; });
-  bindEvents();
-  if (!location.hash) location.hash = '#/home';
-  route();
-}
-document.addEventListener('DOMContentLoaded', initApp);
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-device="pc" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Anime Loft · open source anime streaming</title>
+  <meta name="description" content="Anime Loft is an open source anime catalog and player.">
+  <meta name="theme-color" content="#061521">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Metal+Mania&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+  <link rel="stylesheet" href="style.css">
+  <script>
+    (function () {
+      try {
+        var d = document.documentElement;
+        d.dataset.theme = localStorage.getItem('loft_theme') || 'dark';
+        d.dataset.device = localStorage.getItem('loft_device_mode') || 'pc';
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#app-main">Skip to content</a>
+  <header id="navbar" class="navbar">
+    <nav class="nav-inner" aria-label="Main">
+      <a href="#/home" class="brand" aria-label="Anime Loft home">
+        <span class="brand-mark"><img src="assets/logo.svg" alt="" width="32" height="32"></span>
+        <span class="wordmark"><span class="wm-anime">ANIME</span><span class="wm-loft">LOFT</span></span>
+      </a>
+      <div class="nav-tabs" aria-label="Sections">
+        <a class="nav-tab" href="#/home" data-view="home"><i class="ph ph-house"></i><span>Home</span></a>
+        <a class="nav-tab" href="#/browse" data-view="browse"><i class="ph ph-funnel-simple"></i><span>Browse</span></a>
+        <a class="nav-tab" href="#/list" data-view="list"><i class="ph ph-bookmarks-simple"></i><span>My list</span></a>
+      </div>
+      <form id="search-form" class="nav-search" role="search">
+        <i class="ph ph-magnifying-glass"></i>
+        <input id="search-input" type="search" placeholder="Search anime">
+      </form>
+      <div class="nav-actions">
+        <button id="btn-settings" type="button" class="icon-btn"><i class="ph ph-gear-six"></i></button>
+      </div>
+    </nav>
+  </header>
+  <nav id="tabbar" class="tabbar">
+    <a class="tab-item" href="#/home" data-view="home"><i class="ph ph-house"></i><span>Home</span></a>
+    <a class="tab-item" href="#/browse" data-view="browse"><i class="ph ph-funnel-simple"></i><span>Browse</span></a>
+    <a class="tab-item" href="#/list" data-view="list"><i class="ph ph-bookmarks-simple"></i><span>List</span></a>
+  </nav>
+  <main id="app-main" tabindex="-1">
+    <section id="view-home" class="view" data-view-panel="home">
+      <div id="hero" class="hero"></div>
+      <div class="wrap stack-rows">
+        <div id="row-continue" class="row" hidden><div class="rail" id="rail-continue"></div></div>
+        <div id="home-rows"></div>
+      </div>
+    </section>
+    <section id="view-browse" class="view wrap" data-view-panel="browse" hidden>
+      <form id="filters" class="filters">
+        <select id="f-year" class="field"></select>
+        <select id="f-season" class="field"><option value="">Temporada</option><option value="WINTER">Inverno</option><option value="SPRING">Primavera</option><option value="SUMMER">Verão</option><option value="FALL">Outono</option></select>
+        <select id="f-format" class="field"><option value="">Formato</option><option value="TV">TV</option><option value="MOVIE">Filme</option></select>
+        <select id="f-genre" class="field"></select>
+        <select id="f-sort" class="field"><option value="POPULARITY_DESC">Populares</option><option value="TRENDING_DESC">Em alta</option></select>
+      </form>
+      <div id="browse-grid" class="grid"></div>
+    </section>
+    <section id="view-list" class="view wrap" data-view-panel="list" hidden>
+      <h1 class="heading-4">Minha Lista</h1>
+      <div id="list-continue" class="continue-list"></div>
+      <div id="list-favs" class="grid"></div>
+    </section>
+    <section id="view-search" class="view wrap" data-view-panel="search" hidden>
+      <h1 id="search-h" class="heading-4"></h1>
+      <div id="search-grid" class="grid"></div>
+    </section>
+  </main>
+  <aside id="mascot" class="mascot">
+    <div class="mascot-bubble"><button type="button" id="mascot-min" class="mascot-x"><i class="ph ph-minus"></i></button><strong id="mascot-name">Yuki</strong><p id="mascot-say"></p></div>
+    <button type="button" id="mascot-avatar" class="mascot-avatar"><i class="ph ph-book-open-text"></i></button>
+  </aside>
+  <script src="js/i18n.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/mascot.js"></script>
+</body>
+</html>
