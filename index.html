@@ -96,15 +96,20 @@
     </footer>
   </main>
 
-  <aside id="mascot" class="mascot" style="position:fixed; bottom:20px; right:20px; z-index:100; background:var(--surface); padding:16px; border-radius:16px; border:1px solid var(--line); max-width:300px; display:flex; flex-direction:column; gap:8px;">
-    <strong style="color:#fff">Yuki Nagato</strong>
-    <p id="mascot-say" class="body-6 muted">Oi, eu sou a Yuki.</p>
-    <div style="display:flex; gap:8px;">
-      <button class="btn btn-secondary btn-sm" onclick="LoftMascot.recommend()">Recomendar</button>
-      <a class="btn btn-discord btn-sm" href="#" data-discord>Discord</a>
+  <!-- Yuki (Mascot) -->
+  <aside id="mascot" class="mascot">
+    <div class="mascot-bubble" id="mascot-bubble">
+      <button type="button" id="mascot-min" class="icon-btn mascot-x" style="width:20px;height:20px;font-size:1rem;position:absolute;top:8px;right:8px;"><i class="ph ph-minus"></i></button>
+      <strong class="title-4" id="mascot-name" style="color:#fff">Yuki Nagato</strong>
+      <p class="body-6 muted" id="mascot-say"></p>
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button class="btn btn-secondary btn-sm" onclick="LoftMascot.recommend()">Recomendar</button>
+      </div>
     </div>
+    <button type="button" id="mascot-avatar" class="mascot-avatar" aria-expanded="true"><i class="ph ph-book-open-text"></i></button>
   </aside>
 
+  <!-- Modais -->
   <div id="detail" class="layer" hidden>
     <div class="sheet detail-sheet">
       <button type="button" class="icon-btn sheet-x" data-close><i class="ph ph-x"></i></button>
@@ -140,7 +145,8 @@
         <iframe id="embed-player" title="Video player" allow="autoplay; fullscreen" allowfullscreen></iframe>
         <div id="stage-loading" class="stage-overlay"><p>Carregando player...</p></div>
         <div id="stage-adult" class="stage-adult" hidden>
-          <i class="ph ph-warning-circle big"></i><h3>Conteúdo +18</h3>
+          <i class="ph ph-warning-circle big" style="font-size:3rem; color:var(--coral); margin-bottom:16px;"></i>
+          <h3>Conteúdo +18</h3>
           <p>Provedores externos não permitem a reprodução dentro do site.</p>
           <a id="p-adult-link" href="#" target="_blank" class="btn btn-primary">Assistir no Provedor Externo</a>
         </div>
@@ -177,7 +183,7 @@
     </div>
   </div>
 
-  <div id="toasts" class="toasts" style="position:fixed; bottom:20px; left:50%; transform:translateX(-50%); display:flex; flex-direction:column; gap:10px; z-index:9999;"></div>
+  <div id="toasts" class="toasts" style="position:fixed; bottom:80px; left:50%; transform:translateX(-50%); display:flex; flex-direction:column; gap:10px; z-index:9999;"></div>
 
   <script src="js/i18n.js"></script>
   <script src="js/app.js"></script>
