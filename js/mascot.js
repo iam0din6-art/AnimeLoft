@@ -3,19 +3,16 @@
 window.LoftMascot = {
   idx: 0,
   timer: null,
-  lines: [
-    "Olá! Eu sou a Yuki. O Anime Loft é 100% aberto, feito sem fins lucrativos para fortalecer a comunidade. Aqui você encontra Animes, Filmes, OVAs, Mangás e muito mais em vários idiomas!",
-    "Para manter o site limpo e livre de anúncios chatos, use um Adblock ou o navegador Brave. Isso ajuda a comunidade a assistir sem interrupções!",
-    "Junte-se à nossa comunidade no Discord para sugerir novos idiomas, reportar problemas ou apenas conversar sobre animes!",
-    "Aperte / para buscar de qualquer lugar e Esc para fechar as janelas.",
-    "Se um vídeo não carregar, troque de servidor abaixo do player.",
-    "O Anime Loft é um projeto open source. Confira o código no nosso GitHub!"
-  ],
+  lines: ['mascotHi', 'tipAdblock', 'tipDiscord', 'tipGithub', 'tip1', 'tip2', 'tip3', 'tip4'],
 
   say: function(repaint) {
     if (!repaint) this.idx = (this.idx + 1) % this.lines.length;
     const el = document.getElementById('mascot-say');
-    if (el) el.textContent = this.lines[this.idx];
+    if (!el) return;
+    
+    // Puxa a tradução do i18n.js baseada no idioma selecionado
+    let txt = typeof t === 'function' ? t(this.lines[this.idx]) : '';
+    el.textContent = txt || "Olá! Eu sou a Yuki.";
   },
 
   paintMin: function(min) {
@@ -69,7 +66,7 @@ window.LoftMascot = {
       if (!blocked) {
         const el = document.getElementById('mascot-say');
         if (el) {
-          el.textContent = this.lines[1]; // Puxa direto a frase do Adblock
+          el.textContent = typeof t === 'function' ? t('tipAdblock') : "Use um Adblock ou Brave.";
           this.idx = 1;
         }
       }
