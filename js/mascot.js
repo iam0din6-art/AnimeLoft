@@ -2,17 +2,19 @@
 
 window.LoftMascot = {
   idx: 0,
-  lines: ['mascotHi', 'tip1', 'tip2', 'tip3', 'tip4', 'tipAdblock'],
+  // Removi a dependência do i18n para garantir que a mensagem apareça na tela na hora!
+  lines: [
+    "Oi, eu sou a Yuki! O Anime Loft é feito sem fins lucrativos, apenas para ajudar a comunidade a assistir animes.",
+    "Para mantermos tudo limpo e funcionando, recomendamos usar um Adblock ou o navegador Brave.",
+    "Junte-se a nós no Discord para reportar problemas e sugerir novos recursos!",
+    "O código do projeto é aberto. Você pode ver tudo no nosso GitHub."
+  ],
   
   say: function(repaint) {
     if (!repaint) this.idx = (this.idx + 1) % this.lines.length;
     const el = document.getElementById('mascot-say');
     if (el) {
-      let txt = typeof t === 'function' ? t(this.lines[this.idx]) : '';
-      if (!txt || txt === this.lines[this.idx]) {
-        txt = "Oi, eu sou a Yuki! O Anime Loft é feito sem fins lucrativos, apenas para ajudar a comunidade. Para mantermos tudo limpo e funcionando, recomendamos usar um Adblock ou o navegador Brave. Junte-se a nós no Discord!";
-      }
-      el.textContent = txt;
+      el.textContent = this.lines[this.idx];
     }
   },
 
@@ -23,7 +25,7 @@ window.LoftMascot = {
 
   init: async function() {
     this.say(true);
-    setInterval(() => { if (!document.hidden) this.say(); }, 25000);
+    setInterval(() => { if (!document.hidden) this.say(); }, 20000);
     
     // Puxa a foto da Yuki do AniList
     try {
