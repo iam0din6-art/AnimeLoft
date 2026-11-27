@@ -1,501 +1,172 @@
-<!DOCTYPE html>
-<html lang="en" dir="ltr" data-device="pc" data-theme="dark">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Anime Loft · open source anime streaming</title>
-  <meta name="description" content="Anime Loft is an open source anime catalog and player. Browse AniList, watch with your favorite stream provider, keep favorites and history on your own device.">
-  <meta name="theme-color" content="#061521">
-  <meta name="color-scheme" content="dark light">
+'use strict';
+const APP_VERSION = '2.0.0';
+const ANILIST_API = 'https://graphql.anilist.co';
+const GITHUB_URL = 'https://github.com/iam0din6-art/AnimeLoft';
+const DISCORD_URL = 'https://discord.gg/3qeKkseWSs';
+const SERVERS_URL = 'servers.json';
+const QUERY_TTL = 15 * 60 * 1000;
+const EMBED_TIMEOUT_MS = 15000;
+const HERO_INTERVAL = 8000;
 
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="Anime Loft">
-  <meta property="og:description" content="Open source anime catalog and player. Every season, every story.">
-  <meta property="og:image" content="assets/og.png">
-  <meta name="twitter:card" content="summary_large_image">
+const CONFIG = Object.assign({ anilistClientId: '', rateMax: 24, rateWindowMs: 60000 }, window.LOFT_CONFIG || {});
+const K = { device: 'loft_device_mode', theme: 'loft_theme', lang: 'loft_lang', nsfw: 'loft_nsfw', privacy: 'loft_privacy', servers: 'loft_servers', audio: 'loft_audio', favs: 'loft_favs', cont: 'loft_continue', watched: 'loft_watched', reviews: 'loft_reviews_', token: 'loft_anilist_token', tokenExp: 'loft_anilist_token_exp', clientId: 'loft_anilist_client', mascot: 'loft_mascot_min', serversCache: 'loft_servers_cache' };
 
-  <link rel="manifest" href="manifest.json">
-  <link rel="icon" type="image/png" sizes="48x48" href="assets/favicon-48.png">
-  <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
-  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+const DEFAULT_SERVERS = { version: 2, maintenance: false, servers: [{ id: 'megaplay', label: 'MegaPlay', type: 'embed', enabled: true, url: 'https://megaplay.buzz/stream/ani/{anilistId}/{ep}/{audio}' }] };
+const GENRES_FALLBACK = ['Action', 'Adventure', 'Comedy', 'Drama', 'Fantasy', 'Horror', 'Mystery', 'Romance', 'Sci-Fi', 'Slice of Life'];
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preconnect" href="https://graphql.anilist.co" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Metal+Mania&display=swap" rel="stylesheet">
-  <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
-  <link rel="stylesheet" href="style.css">
+const $ = (id) => document.getElementById(id);
+const qsa = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
-  <!-- Apply saved theme/device before first paint so nothing flashes -->
-  <script>
-    (function () {
-      try {
-        var d = document.documentElement;
-        d.dataset.theme = localStorage.getItem('loft_theme') || 'dark';
-        d.dataset.device = localStorage.getItem('loft_device_mode') || 'pc';
-      } catch (e) {}
-    })();
-  </script>
-</head>
+function lsGet(key, fallback = null) { try { const v = localStorage.getItem(key); return v === null ? fallback : v; } catch (e) { return fallback; } }
+function lsSet(key, value) { try { localStorage.setItem(key, value); } catch (e) {} }
+function lsDel(key) { try { localStorage.removeItem(key); } catch (e) {} }
+function lsJSON(key, fallback) { try { const v = localStorage.getItem(key); if (!v) return fallback; return JSON.parse(v); } catch (e) { return fallback; } }
+function lsSetJSON(key, value) { lsSet(key, JSON.stringify(value)); }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+function hashStr(s) { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36); }
 
-<body>
-  <a class="skip-link" href="#app-main" data-i18n="skip">Skip to content</a>
+const I18N = window.LOFT_I18N || { strings: { pt: {} } };
+function t(key, vars) { const dict = I18N.strings[state.lang] || I18N.strings.pt || {}; let s = dict[key] || key; if (vars) s = s.replace(/\{(\w+)\}/g, (_, k) => (vars[k] != null ? vars[k] : '')); return s; }
 
-  <!-- ============================== NAVBAR (z-40) ============================== -->
-  <header id="navbar" class="navbar">
-    <nav class="nav-inner" aria-label="Main">
-      <a href="#/home" class="brand" id="brand" aria-label="Anime Loft home">
-        <span class="brand-mark">
-          <img src="assets/logo.svg" alt="" width="32" height="32" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'">
-          <span class="brand-fallback" style="display:none" aria-hidden="true">
-            <svg viewBox="0 0 64 64" width="32" height="32"><rect width="64" height="64" rx="14" fill="#061521"/><path d="M10 46 L20 14 L25 32 L32 8 L39 32 L44 14 L54 46 Z" fill="#F3FEFF"/><path d="M25 46 L32 30 L39 46 Z" fill="#0193E9"/><rect x="10" y="49" width="44" height="6" rx="3" fill="#1FAEF5"/></svg>
-          </span>
-        </span>
-        <span class="wordmark"><span class="wm-anime">ANIME</span><span class="wm-loft">LOFT</span></span>
-      </a>
+const state = { lang: 'pt', device: lsGet(K.device), theme: lsGet(K.theme, 'dark'), nsfw: lsGet(K.nsfw) === '1', privacy: lsGet(K.privacy) === '1', config: DEFAULT_SERVERS, prefs: lsJSON(K.servers, { enabled: {}, default: '' }), media: new Map(), detail: null, view: 'home', browse: { page: 1 }, stack: [], genres: GENRES_FALLBACK };
 
-      <div class="nav-tabs" aria-label="Sections">
-        <a class="nav-tab" href="#/home" data-view="home"><i class="ph ph-house" aria-hidden="true"></i><span data-i18n="home">Home</span></a>
-        <a class="nav-tab" href="#/browse" data-view="browse"><i class="ph ph-funnel-simple" aria-hidden="true"></i><span data-i18n="browse">Browse</span></a>
-        <a class="nav-tab" href="#/list" data-view="list"><i class="ph ph-bookmarks-simple" aria-hidden="true"></i><span data-i18n="myList">My list</span></a>
-      </div>
+function toast(msg, { type = 'info', ms = 4200 } = {}) {
+  const box = $('toasts'); if (!box) return;
+  const el = document.createElement('div'); el.className = `toast ${type}`; el.innerHTML = `<span>${esc(msg)}</span>`;
+  box.appendChild(el); setTimeout(() => el.remove(), ms);
+}
 
-      <form id="search-form" class="nav-search" role="search">
-        <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
-        <label for="search-input" class="sr-only" data-i18n="searchPh">Search anime</label>
-        <input id="search-input" type="search" autocomplete="off" enterkeyhint="search" data-i18n-ph="searchPh" placeholder="Search anime">
-        <kbd class="kbd hide-touch">/</kbd>
-      </form>
+const MEDIA_FIELDS = `id idMal type title { romaji english native userPreferred } coverImage { extraLarge large color } bannerImage format status episodes duration season seasonYear averageScore popularity genres isAdult startDate { year } nextAiringEpisode { episode airingAt timeUntilAiring }`;
+function adultVar() { return state.nsfw ? undefined : false; }
 
-      <div class="nav-actions">
-        <button id="btn-search-mobile" type="button" class="icon-btn show-mobile" aria-label="Search"><i class="ph ph-magnifying-glass"></i></button>
-        <button id="btn-surprise" type="button" class="icon-btn" data-i18n-title="surprise" title="Surprise me"><i class="ph ph-shuffle"></i></button>
-        <a class="icon-btn hide-mobile" data-github href="https://github.com/iam0din6-art/AnimeLoft" target="_blank" rel="noopener noreferrer" aria-label="GitHub" title="GitHub"><i class="ph ph-github-logo"></i></a>
-        <a class="icon-btn hide-mobile" data-discord href="https://discord.gg/3qeKkseWSs" target="_blank" rel="noopener noreferrer" aria-label="Discord" title="Discord"><i class="ph ph-discord-logo"></i></a>
-        <button id="btn-settings" type="button" class="icon-btn" data-i18n-title="settings" title="Settings"><i class="ph ph-gear-six"></i></button>
-        <button id="btn-account" type="button" class="account-btn" aria-haspopup="menu">
-          <span id="account-avatar" class="avatar"><i class="ph ph-user"></i></span>
-          <span id="account-label" class="hide-mobile" data-i18n="login">Sign in</span>
-        </button>
-        <div id="account-menu" class="account-menu" role="menu" hidden>
-          <strong id="account-name"></strong>
-          <a id="account-profile" role="menuitem" target="_blank" rel="noopener noreferrer" data-i18n="profile">AniList profile</a>
-          <button id="btn-logout" type="button" role="menuitem" data-i18n="logout">Sign out</button>
-        </div>
-      </div>
-    </nav>
-  </header>
+async function gql(query, variables = {}, { auth = false, cache = true } = {}) {
+  const headers = { 'Content-Type': 'application/json' }; if (auth && state.token) headers.Authorization = `Bearer ${state.token}`;
+  const key = 'loft_q_' + hashStr(query + JSON.stringify(variables));
+  if (cache) { try { const hit = JSON.parse(sessionStorage.getItem(key) || 'null'); if (hit && Date.now() - hit.at < QUERY_TTL) return hit.data; } catch (e) {} }
+  const res = await fetch(ANILIST_API, { method: 'POST', headers, body: JSON.stringify({ query, variables }) });
+  const json = await res.json();
+  if (!res.ok || json.errors) throw new Error('API Error');
+  if (cache) { try { sessionStorage.setItem(key, JSON.stringify({ at: Date.now(), data: json.data })); } catch (e) {} }
+  return json.data;
+}
 
-  <!-- Bottom tab bar for phones -->
-  <nav id="tabbar" class="tabbar" aria-label="Sections">
-    <a class="tab-item" href="#/home" data-view="home"><i class="ph ph-house"></i><span data-i18n="home">Home</span></a>
-    <a class="tab-item" href="#/browse" data-view="browse"><i class="ph ph-funnel-simple"></i><span data-i18n="browse">Browse</span></a>
-    <a class="tab-item" href="#/list" data-view="list"><i class="ph ph-bookmarks-simple"></i><span data-i18n="myList">My list</span></a>
-    <button class="tab-item" type="button" data-open-settings><i class="ph ph-gear-six"></i><span data-i18n="settings">Settings</span></button>
-  </nav>
+function remember(list) { (list || []).forEach((m) => { if (m && m.id) state.media.set(m.id, Object.assign(state.media.get(m.id) || {}, m)); }); return list || []; }
+function titleOf(m) { if (!m) return ''; const tt = m.title || {}; return tt.english || tt.userPreferred || tt.romaji || tt.native || ''; }
+function coverOf(m) { return (m.coverImage && (m.coverImage.extraLarge || m.coverImage.large)) || ''; }
 
-  <!-- ============================== MAIN ============================== -->
-  <main id="app-main" tabindex="-1">
+function cardHTML(m) {
+  const title = titleOf(m);
+  const score = m.averageScore ? `<span class="badge badge-score">★ ${(m.averageScore / 10).toFixed(1)}</span>` : '';
+  return `<button type="button" class="card" data-open="${m.id}"><div class="card-poster"><div class="card-badges">${score}</div><img src="${esc(coverOf(m))}" loading="lazy"><div class="card-play"><span><i class="ph-fill ph-play"></i></span></div></div><span class="card-title clamp-2">${esc(title)}</span><span class="card-sub">${m.format} · ${m.seasonYear || ''}</span></button>`;
+}
+function skeletonCards(n = 8) { return Array.from({ length: n }, () => '<div class="skel-card"><div class="skeleton"></div><div class="skeleton skel-line"></div></div>').join(''); }
+function emptyHTML(icon, text) { return `<div class="empty"><i class="ph ${icon} big"></i><p class="body-6 muted">${esc(text)}</p></div>`; }
 
-    <!-- HOME -->
-    <section id="view-home" class="view" data-view-panel="home" aria-labelledby="home-h">
-      <h1 id="home-h" class="sr-only">Anime Loft</h1>
-      <div id="hero" class="hero" aria-roledescription="carousel" aria-label="Featured"></div>
+function parseHash() { const h = location.hash.replace(/^#\/?/, ''); const [path, query = ''] = h.split('?'); return { path: path || 'home', params: new URLSearchParams(query) }; }
+function route() {
+  const { path, params } = parseHash();
+  const view = ['home', 'browse', 'list', 'search'].includes(path) ? path : 'home';
+  showView(view);
+  if (view === 'home') loadHome();
+  if (view === 'browse') loadBrowse();
+  if (view === 'list') renderList();
+  if (view === 'search') runSearch(params.get('q') || '');
+}
+function showView(view) {
+  state.view = view;
+  qsa('[data-view-panel]').forEach((p) => { p.hidden = p.dataset.viewPanel !== view; });
+  qsa('[data-view]').forEach((a) => { if (a.dataset.view === view) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+}
 
-      <div class="wrap stack-rows">
-        <section id="row-continue" class="row" hidden>
-          <div class="row-head">
-            <h2 class="heading-5" data-i18n="continueWatching">Continue watching</h2>
-            <a class="link-sm" href="#/list" data-i18n="seeAll">See all</a>
-          </div>
-          <div class="rail" id="rail-continue"></div>
-        </section>
-        <div id="home-rows"></div>
-      </div>
+const HOME_QUERY = `query($season: MediaSeason, $year: Int, $adult: Boolean) { trending: Page(perPage: 20) { media(type: ANIME, sort: TRENDING_DESC, isAdult: $adult) { ${MEDIA_FIELDS} } } }`;
+async function loadHome() {
+  const cur = new Date(); const season = ['WINTER', 'SPRING', 'SUMMER', 'FALL'][Math.floor(cur.getMonth() / 3)];
+  const vars = { season, year: cur.getFullYear() }; const adult = adultVar(); if (adult !== undefined) vars.adult = adult;
+  $('hero').innerHTML = '<div class="skeleton" style="height:400px"></div>'; $('home-rows').innerHTML = skeletonCards(6);
+  try {
+    const data = await gql(HOME_QUERY, vars);
+    const list = remember(data.trending.media);
+    if (list.length) {
+      const m = list[0];
+      $('hero').innerHTML = `<div class="hero-stage"><img src="${esc(m.bannerImage || coverOf(m))}"><div class="hero-copy"><h2>${esc(titleOf(m))}</h2><button class="btn btn-primary" data-play="${m.id}">Assistir</button></div></div>`;
+    }
+    $('home-rows').innerHTML = list.map(cardHTML).join('');
+  } catch (e) { $('home-rows').innerHTML = emptyHTML('ph-warning', 'Erro ao carregar'); }
+}
 
-      <section class="tagline wrap" aria-label="Tagline">
-        <p id="tagline-text" class="tagline-text"></p>
-      </section>
-    </section>
+const BROWSE_QUERY = `query($page: Int, $season: MediaSeason, $seasonYear: Int, $format: MediaFormat, $genre: String, $sort: [MediaSort], $adult: Boolean) { Page(page: $page, perPage: 30) { pageInfo { hasNextPage } media(type: ANIME, season: $season, seasonYear: $seasonYear, format: $format, genre: $genre, sort: $sort, isAdult: $adult) { ${MEDIA_FIELDS} } } }`;
+async function loadBrowse() {
+  const vars = { page: 1, sort: [$('f-sort').value || 'POPULARITY_DESC'] };
+  const adult = adultVar(); if (adult !== undefined) vars.adult = adult;
+  const season = $('f-season').value; if (season) vars.season = season;
+  const year = Number($('f-year').value); if (year) vars.seasonYear = year;
+  const format = $('f-format').value; if (format) vars.format = format;
+  const genre = $('f-genre').value; if (genre) vars.genre = genre;
 
-    <!-- SEARCH RESULTS -->
-    <section id="view-search" class="view wrap" data-view-panel="search" hidden aria-labelledby="search-h">
-      <div class="page-head">
-        <h1 id="search-h" class="heading-4"></h1>
-        <button type="button" class="btn btn-ghost" id="search-clear"><i class="ph ph-x"></i><span data-i18n="clear">Clear</span></button>
-      </div>
-      <div id="search-grid" class="grid"></div>
-    </section>
+  $('browse-grid').innerHTML = skeletonCards(12);
+  try {
+    const data = await gql(BROWSE_QUERY, vars);
+    const list = remember(data.Page.media);
+    $('browse-grid').innerHTML = list.length ? list.map(cardHTML).join('') : emptyHTML('ph-magnifying-glass', 'Nenhum anime encontrado');
+  } catch (e) { $('browse-grid').innerHTML = emptyHTML('ph-warning', 'Erro'); }
+}
 
-    <!-- BROWSE / FILTERS -->
-    <section id="view-browse" class="view wrap" data-view-panel="browse" hidden aria-labelledby="browse-h">
-      <div class="page-head">
-        <h1 id="browse-h" class="heading-4" data-i18n="browseTitle">Categories and filters</h1>
-        <span id="browse-count" class="caption-4 muted" aria-live="polite"></span>
-      </div>
+const SEARCH_QUERY = `query($q: String, $adult: Boolean) { Page(perPage: 40) { media(type: ANIME, search: $q, sort: SEARCH_MATCH, isAdult: $adult) { ${MEDIA_FIELDS} } } }`;
+async function runSearch(q) {
+  q = q.trim(); $('search-h').textContent = `Resultados para "${q}"`;
+  const grid = $('search-grid'); if (!q) { grid.innerHTML = emptyHTML('ph-magnifying-glass', 'Buscar anime'); return; }
+  grid.innerHTML = skeletonCards(12);
+  const vars = { q }; const adult = adultVar(); if (adult !== undefined) vars.adult = adult;
+  try {
+    const data = await gql(SEARCH_QUERY, vars);
+    const list = remember(data.Page.media);
+    grid.innerHTML = list.length ? list.map(cardHTML).join('') : emptyHTML('ph-ghost', `Nada encontrado para "${q}"`);
+  } catch (e) { grid.innerHTML = emptyHTML('ph-warning', 'Erro na busca'); }
+}
 
-      <form id="filters" class="filters" aria-label="Filters">
-        <label class="field-wrap"><span class="caption-3" data-i18n="year">Year</span>
-          <select id="f-year" class="field"></select></label>
-        <label class="field-wrap"><span class="caption-3" data-i18n="season">Season</span>
-          <select id="f-season" class="field">
-            <option value="" data-i18n="any">Any</option>
-            <option value="WINTER" data-i18n="WINTER">Winter</option>
-            <option value="SPRING" data-i18n="SPRING">Spring</option>
-            <option value="SUMMER" data-i18n="SUMMER">Summer</option>
-            <option value="FALL" data-i18n="FALL">Fall</option>
-          </select></label>
-        <label class="field-wrap"><span class="caption-3" data-i18n="format">Format</span>
-          <select id="f-format" class="field">
-            <option value="" data-i18n="any">Any</option>
-            <option value="TV">TV</option>
-            <option value="MOVIE" data-i18n="MOVIE">Movie</option>
-            <option value="OVA">OVA</option>
-            <option value="ONA">ONA</option>
-            <option value="SPECIAL" data-i18n="SPECIAL">Special</option>
-            <option value="TV_SHORT" data-i18n="TV_SHORT">TV short</option>
-          </select></label>
-        <label class="field-wrap"><span class="caption-3" data-i18n="genre">Genre</span>
-          <select id="f-genre" class="field"></select></label>
-        <label class="field-wrap"><span class="caption-3" data-i18n="sort">Sort by</span>
-          <select id="f-sort" class="field">
-            <option value="POPULARITY_DESC" data-i18n="sortPopular">Most popular</option>
-            <option value="TRENDING_DESC" data-i18n="sortTrending">Trending</option>
-            <option value="SCORE_DESC" data-i18n="sortScore">Highest rated</option>
-            <option value="START_DATE_DESC" data-i18n="sortNewest">Newest</option>
-            <option value="FAVOURITES_DESC" data-i18n="sortFavs">Most favorited</option>
-          </select></label>
-        <button type="reset" class="btn btn-ghost field-reset"><i class="ph ph-arrow-counter-clockwise"></i><span data-i18n="reset">Reset</span></button>
-      </form>
+function renderList() {
+  const cont = Object.values(lsJSON(K.cont, {})).sort((a, b) => b.updated - a.updated);
+  $('list-continue').innerHTML = cont.length ? cont.map((c) => `<div class="cw-card"><img src="${c.cover}" width="80"><div><strong>${esc(c.title)}</strong><p>Episódio ${c.ep}</p></div></div>`).join('') : emptyHTML('ph-play-circle', 'Nada aqui');
+  const favs = lsJSON(K.favs, []);
+  $('list-favs').innerHTML = favs.length ? favs.map(cardHTML).join('') : emptyHTML('ph-heart', 'Nada aqui');
+}
 
-      <div id="genre-chips" class="chips" role="group" aria-label="Quick genres"></div>
-      <div id="browse-grid" class="grid"></div>
-      <div class="center-pad"><button id="browse-more" type="button" class="btn btn-secondary" hidden><span data-i18n="loadMore">Load more</span></button></div>
-    </section>
+async function openDetail(id) {
+  const m = state.media.get(id); if (!m) return; state.detail = m;
+  const el = $('detail'); el.hidden = false; document.body.classList.add('locked');
+  $('d-title').textContent = titleOf(m);
+  $('d-cover').src = coverOf(m);
+  $('d-desc').textContent = m.description || 'Sem descrição.';
+  $('d-play').onclick = () => { el.hidden = true; document.body.classList.remove('locked'); playAnime(m.id); };
+}
+function closeLayer() { qsa('.layer').forEach(l => l.hidden = true); document.body.classList.remove('locked'); }
 
-    <!-- MY LIST -->
-    <section id="view-list" class="view wrap" data-view-panel="list" hidden aria-labelledby="list-h">
-      <div class="page-head">
-        <h1 id="list-h" class="heading-4" data-i18n="myList">My list</h1>
-        <span id="list-sync" class="caption-4 muted"></span>
-      </div>
+async function playAnime(id) {
+  toast('Abrindo player...');
+  try {
+    const data = await gql(`query($id: Int) { Media(id: $id) { id } }`, { id });
+    const server = DEFAULT_SERVERS.servers[0].url.replace('{anilistId}', id).replace('{ep}', 1).replace('{audio}', 'sub');
+    window.open(server, '_blank');
+  } catch (e) { toast('Erro'); }
+}
 
-      <section class="list-block" aria-labelledby="lc-h">
-        <div class="row-head">
-          <h2 id="lc-h" class="heading-6"><i class="ph ph-play-circle"></i> <span data-i18n="continueWatching">Continue watching</span></h2>
-          <button id="btn-clear-history" type="button" class="link-sm" data-i18n="clearHistory">Clear history</button>
-        </div>
-        <div id="list-continue" class="continue-list"></div>
-      </section>
+function bindEvents() {
+  document.addEventListener('click', (e) => {
+    const open = e.target.closest('[data-open]'); if (open) { openDetail(Number(open.dataset.open)); return; }
+    const play = e.target.closest('[data-play]'); if (play) { playAnime(Number(play.dataset.play)); return; }
+    const close = e.target.closest('[data-close]'); if (close) { closeLayer(); return; }
+  });
+  window.addEventListener('hashchange', route);
+  if ($('filters')) $('filters').addEventListener('change', debounce(loadBrowse, 300));
+  const input = $('search-input');
+  if(input) input.addEventListener('keydown', (e) => { if (e.key === 'Enter') location.hash = '#/search?q=' + encodeURIComponent(e.target.value); });
+}
 
-      <section class="list-block" aria-labelledby="lf-h">
-        <div class="row-head">
-          <h2 id="lf-h" class="heading-6"><i class="ph ph-heart"></i> <span data-i18n="favorites">Favorites</span></h2>
-        </div>
-        <div id="list-favs" class="grid"></div>
-      </section>
-
-      <section id="list-anilist" class="list-block" hidden aria-labelledby="la-h">
-        <div class="row-head">
-          <h2 id="la-h" class="heading-6"><i class="ph ph-cloud-check"></i> <span data-i18n="anilistLists">From your AniList</span></h2>
-          <div id="al-filter" class="seg" role="tablist"></div>
-        </div>
-        <div id="list-al" class="grid"></div>
-      </section>
-    </section>
-
-    <footer class="footer wrap">
-      <a href="#/home" class="wordmark wordmark-sm" aria-label="Anime Loft"><span class="wm-anime">ANIME</span><span class="wm-loft">LOFT</span></a>
-      <p class="body-6 muted" data-i18n="footNote">Anime Loft is open source. It hosts no video files; streams come from third party providers and catalog data from AniList.</p>
-      <div class="footer-links">
-        <a data-github href="https://github.com/iam0din6-art/AnimeLoft" target="_blank" rel="noopener noreferrer"><i class="ph ph-github-logo"></i> GitHub</a>
-        <a data-discord href="https://discord.gg/3qeKkseWSs" target="_blank" rel="noopener noreferrer"><i class="ph ph-discord-logo"></i> Discord</a>
-        <a href="https://anilist.co" target="_blank" rel="noopener noreferrer"><i class="ph ph-database"></i> AniList</a>
-        <button type="button" id="btn-shortcuts" class="link-plain"><i class="ph ph-keyboard"></i> <span data-i18n="shortcuts">Shortcuts</span></button>
-      </div>
-    </footer>
-  </main>
-
-  <!-- ============================== MASCOT (z-40) ============================== -->
-  <aside id="mascot" class="mascot" aria-label="Yuki Nagato assistant">
-    <div class="mascot-bubble" id="mascot-bubble">
-      <button type="button" id="mascot-min" class="mascot-x" aria-label="Minimize"><i class="ph ph-minus"></i></button>
-      <strong class="title-4" id="mascot-name">Yuki Nagato</strong>
-      <p class="body-6" id="mascot-say"></p>
-      <div class="mascot-actions">
-        <button type="button" id="mascot-random" class="btn btn-primary btn-sm"><i class="ph ph-shuffle"></i><span data-i18n="mascotRandom">Recommend one</span></button>
-        <a class="btn btn-ghost btn-sm" data-discord href="https://discord.gg/3qeKkseWSs" target="_blank" rel="noopener noreferrer"><i class="ph ph-discord-logo"></i>Discord</a>
-        <a class="btn btn-ghost btn-sm" data-github href="https://github.com/iam0din6-art/AnimeLoft" target="_blank" rel="noopener noreferrer"><i class="ph ph-github-logo"></i>GitHub</a>
-      </div>
-    </div>
-    <button type="button" id="mascot-avatar" class="mascot-avatar" aria-label="Yuki Nagato" aria-expanded="true"><i class="ph ph-book-open-text"></i></button>
-  </aside>
-
-  <!-- ============================== DETAIL MODAL (z-50) ============================== -->
-  <div id="detail" class="layer layer-detail" role="dialog" aria-modal="true" aria-labelledby="d-title" hidden>
-    <div class="scrim" data-close></div>
-    <article class="sheet detail-sheet">
-      <button type="button" class="icon-btn sheet-x" data-close aria-label="Close"><i class="ph ph-x"></i></button>
-      <div class="d-banner" id="d-banner"></div>
-      <div class="d-body">
-        <div class="d-top">
-          <img id="d-cover" class="d-cover" alt="">
-          <div class="d-info">
-            <div id="d-badges" class="badges"></div>
-            <h2 id="d-title" class="heading-4 balance"></h2>
-            <p id="d-native" class="caption-2 muted"></p>
-            <div id="d-meta" class="meta-line"></div>
-            <div class="d-actions">
-              <button type="button" id="d-play" class="btn btn-primary"><i class="ph-fill ph-play"></i><span></span></button>
-              <button type="button" id="d-trailer" class="btn btn-secondary"><i class="ph ph-film-strip"></i><span data-i18n="trailer">Trailer</span></button>
-              <button type="button" id="d-fav" class="btn btn-secondary" aria-pressed="false"><i class="ph ph-heart"></i><span></span></button>
-              <label class="al-status" id="d-al-wrap" hidden>
-                <span class="sr-only" data-i18n="anilistStatus">AniList status</span>
-                <i class="ph ph-cloud-arrow-up" aria-hidden="true"></i>
-                <select id="d-al-status" class="field field-sm"></select>
-              </label>
-            </div>
-          </div>
-        </div>
-
-        <p id="d-desc" class="body-6 d-desc pretty"></p>
-        <div id="d-genres" class="chips chips-static"></div>
-
-        <section class="d-section" aria-labelledby="d-eps-h">
-          <div class="row-head">
-            <h3 id="d-eps-h" class="heading-6" data-i18n="episodes">Episodes</h3>
-            <div class="row-head-tools">
-              <select id="d-ep-range" class="field field-sm" hidden aria-label="Episode range"></select>
-              <span id="d-ep-note" class="caption-4 muted"></span>
-            </div>
-          </div>
-          <div id="d-episodes" class="ep-grid"></div>
-        </section>
-
-        <section class="d-section" id="d-rel-wrap" hidden aria-labelledby="d-rel-h">
-          <h3 id="d-rel-h" class="heading-6" data-i18n="related">Related and recommended</h3>
-          <div class="rail rail-sm" id="d-related"></div>
-        </section>
-
-        <section class="d-section" aria-labelledby="d-rev-h">
-          <h3 id="d-rev-h" class="heading-6" data-i18n="reviews">Community reviews</h3>
-          <form id="review-form" class="review-form" novalidate>
-            <div class="stars-input" role="radiogroup" data-i18n-aria="yourRating" aria-label="Your rating"></div>
-            <label class="sr-only" for="review-text" data-i18n="commentPh">Comment</label>
-            <textarea id="review-text" class="field" rows="3" maxlength="600" data-i18n-ph="commentPh"></textarea>
-            <p id="review-err" class="caption-4 err" role="alert" hidden></p>
-            <div class="review-foot">
-              <span class="caption-5 muted" data-i18n="reviewLocal">Saved on this device</span>
-              <button type="submit" class="btn btn-primary btn-sm"><i class="ph ph-paper-plane-tilt"></i><span data-i18n="postReview">Post review</span></button>
-            </div>
-          </form>
-          <div id="review-summary" class="review-summary"></div>
-          <ul id="review-list" class="review-list"></ul>
-        </section>
-      </div>
-    </article>
-  </div>
-
-  <!-- ============================== PLAYER MODAL (z-60) ============================== -->
-  <div id="player" class="layer layer-player" role="dialog" aria-modal="true" aria-labelledby="p-title" hidden>
-    <div class="player-shell" id="player-shell">
-      <header class="player-top">
-        <button type="button" class="icon-btn" data-close aria-label="Close player"><i class="ph ph-arrow-left"></i></button>
-        <div class="player-title">
-          <strong id="p-title" class="title-3 clamp-1"></strong>
-          <span id="p-sub" class="caption-4 muted"></span>
-        </div>
-        <button type="button" id="p-fullscreen" class="icon-btn" aria-label="Fullscreen (F)" title="Fullscreen (F)"><i class="ph ph-corners-out"></i></button>
-      </header>
-
-      <div class="stage" id="stage">
-        <iframe id="embed-player" title="Video player" allow="autoplay; fullscreen; encrypted-media; picture-in-picture; clipboard-write" allowfullscreen referrerpolicy="origin"></iframe>
-        <div id="stage-loading" class="stage-overlay">
-          <div class="skeleton stage-skel"></div>
-          <p class="body-5" data-i18n="loadingPlayer">Loading player</p>
-        </div>
-        <div id="stage-hint" class="stage-hint" hidden>
-          <p class="body-5" data-i18n="playerHint">Black screen? Switch servers or open the direct player.</p>
-        </div>
-      </div>
-
-      <div class="player-bar" role="toolbar" aria-label="Player controls">
-        <div class="pbar-group">
-          <button type="button" id="p-prev" class="btn btn-secondary btn-sm"><i class="ph ph-skip-back"></i><span class="hide-mobile" data-i18n="prev">Previous</span></button>
-          <label class="pbar-ep"><span class="sr-only" data-i18n="episode">Episode</span>
-            <select id="p-episode" class="field field-sm"></select></label>
-          <button type="button" id="p-next" class="btn btn-primary btn-sm"><span data-i18n="next">Next episode</span><i class="ph ph-skip-forward"></i></button>
-        </div>
-        <div class="pbar-group">
-          <div class="seg" id="p-audio" role="radiogroup" aria-label="Audio">
-            <button type="button" data-audio="sub" role="radio">SUB</button>
-            <button type="button" data-audio="dub" role="radio">DUB</button>
-          </div>
-          <button type="button" id="p-reload" class="btn btn-secondary btn-sm"><i class="ph ph-arrow-clockwise"></i><span data-i18n="reload">Reload</span></button>
-          <a id="p-direct" class="btn btn-secondary btn-sm" target="_blank" rel="noopener noreferrer"><i class="ph ph-rocket-launch"></i><span data-i18n="openDirect">Open direct player</span></a>
-        </div>
-      </div>
-      <div class="server-row">
-        <span class="caption-3 muted"><i class="ph ph-hard-drives"></i> <span data-i18n="switchServer">Switch server</span></span>
-        <div id="p-servers" class="server-list" role="radiogroup" aria-label="Servers"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ============================== TRAILER (z-65) ============================== -->
-  <div id="trailer" class="layer layer-trailer" role="dialog" aria-modal="true" aria-label="Trailer" hidden>
-    <div class="scrim" data-close></div>
-    <div class="trailer-box">
-      <button type="button" class="icon-btn sheet-x" data-close aria-label="Close"><i class="ph ph-x"></i></button>
-      <iframe id="trailer-frame" title="Trailer" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>
-    </div>
-  </div>
-
-  <!-- ============================== TOASTS (z-70) ============================== -->
-  <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
-
-  <!-- ============================== SETTINGS (z-75) ============================== -->
-  <div id="settings" class="layer layer-settings" role="dialog" aria-modal="true" aria-labelledby="s-title" hidden>
-    <div class="scrim" data-close></div>
-    <div class="sheet settings-sheet">
-      <header class="settings-head">
-        <span class="wordmark wordmark-sm" aria-hidden="true"><span class="wm-anime">ANIME</span><span class="wm-loft">LOFT</span></span>
-        <h2 id="s-title" class="heading-6" data-i18n="settings">Settings</h2>
-        <button type="button" class="icon-btn" data-close aria-label="Close"><i class="ph ph-x"></i></button>
-      </header>
-      <div class="settings-body">
-
-        <section class="set-group">
-          <h3 class="title-4 set-h"><i class="ph ph-devices"></i><span data-i18n="device">Device</span></h3>
-          <div class="seg seg-wide" id="s-device" role="radiogroup">
-            <button type="button" data-device="pc" role="radio"><i class="ph ph-desktop"></i><span data-i18n="devicePc">Computer</span></button>
-            <button type="button" data-device="tv" role="radio"><i class="ph ph-television-simple"></i><span data-i18n="deviceTv">TV / Console</span></button>
-            <button type="button" data-device="mobile" role="radio"><i class="ph ph-device-mobile"></i><span data-i18n="deviceMobile">Phone / Tablet</span></button>
-          </div>
-        </section>
-
-        <section class="set-group">
-          <h3 class="title-4 set-h"><i class="ph ph-palette"></i><span data-i18n="theme">Theme</span></h3>
-          <div class="theme-cards" id="s-theme" role="radiogroup">
-            <button type="button" data-theme-opt="dark" role="radio"><span class="swatch sw-dark"></span><span data-i18n="themeDark">Modern dark</span></button>
-            <button type="button" data-theme-opt="oled" role="radio"><span class="swatch sw-oled"></span><span data-i18n="themeOled">OLED black</span></button>
-            <button type="button" data-theme-opt="sky" role="radio"><span class="swatch sw-sky"></span><span data-i18n="themeSky">Sky light</span></button>
-          </div>
-        </section>
-
-        <section class="set-group">
-          <h3 class="title-4 set-h"><i class="ph ph-translate"></i><span data-i18n="language">Language</span></h3>
-          <select id="s-lang" class="field" aria-label="Language"></select>
-        </section>
-
-        <section class="set-group">
-          <h3 class="title-4 set-h"><i class="ph ph-hard-drives"></i><span data-i18n="providers">Stream providers</span></h3>
-          <label class="field-wrap"><span class="caption-3" data-i18n="defaultServer">Default server</span>
-            <select id="s-default-server" class="field"></select></label>
-          <ul id="s-servers" class="toggle-list"></ul>
-        </section>
-
-        <section class="set-group">
-          <h3 class="title-4 set-h"><i class="ph ph-shield-check"></i><span data-i18n="content">Content and privacy</span></h3>
-          <ul class="toggle-list">
-            <li class="toggle-row">
-              <div><span class="body-5" data-i18n="nsfw">Show 18+ titles</span><p class="caption-5 muted" data-i18n="nsfwHint">Adult titles stay hidden from the catalog unless you turn this on.</p></div>
-              <input type="checkbox" id="s-nsfw" class="switch" role="switch">
-            </li>
-            <li class="toggle-row">
-              <div><span class="body-5" data-i18n="privacy">Privacy mode</span><p class="caption-5 muted" data-i18n="privacyHint">Hide Continue watching from the home screen.</p></div>
-              <input type="checkbox" id="s-privacy" class="switch" role="switch">
-            </li>
-          </ul>
-        </section>
-
-        <section class="set-group">
-          <h3 class="title-4 set-h"><i class="ph ph-cloud"></i>AniList</h3>
-          <p class="caption-5 muted" id="s-al-hint"></p>
-          <label class="field-wrap"><span class="caption-3" data-i18n="clientId">Client ID</span>
-            <input id="s-client-id" class="field" inputmode="numeric" autocomplete="off" placeholder="12345"></label>
-          <p class="caption-5 muted"><span data-i18n="redirectIs">Redirect URL to register:</span> <code id="s-redirect"></code></p>
-          <div class="row-btns">
-            <button type="button" id="s-al-login" class="btn btn-primary btn-sm"><i class="ph ph-sign-in"></i><span data-i18n="login">Sign in</span></button>
-            <button type="button" id="s-al-logout" class="btn btn-ghost btn-sm" hidden><i class="ph ph-sign-out"></i><span data-i18n="logout">Sign out</span></button>
-          </div>
-        </section>
-
-        <section class="set-group">
-          <h3 class="title-4 set-h"><i class="ph ph-database"></i><span data-i18n="data">Your data</span></h3>
-          <div class="row-btns">
-            <button type="button" id="s-clear-history" class="btn btn-secondary btn-sm"><i class="ph ph-clock-counter-clockwise"></i><span data-i18n="clearHistory">Clear history</span></button>
-            <button type="button" id="s-clear-cache" class="btn btn-secondary btn-sm"><i class="ph ph-broom"></i><span data-i18n="clearCache">Clear cache</span></button>
-            <button type="button" id="s-shortcuts" class="btn btn-ghost btn-sm"><i class="ph ph-keyboard"></i><span data-i18n="shortcuts">Shortcuts</span></button>
-          </div>
-        </section>
-
-        <section class="set-group set-community">
-          <h3 class="title-4 set-h"><i class="ph ph-users-three"></i><span data-i18n="community">Open source community</span></h3>
-          <div class="row-btns">
-            <a class="btn btn-secondary btn-sm" data-github href="https://github.com/iam0din6-art/AnimeLoft" target="_blank" rel="noopener noreferrer"><i class="ph ph-github-logo"></i>GitHub</a>
-            <a class="btn btn-discord btn-sm" data-discord href="https://discord.gg/3qeKkseWSs" target="_blank" rel="noopener noreferrer"><i class="ph ph-discord-logo"></i>Discord</a>
-          </div>
-          <p class="caption-5 muted" id="s-version"></p>
-        </section>
-      </div>
-    </div>
-  </div>
-
-  <!-- Keyboard shortcuts sheet (shares settings layer level) -->
-  <div id="shortcuts" class="layer layer-settings" role="dialog" aria-modal="true" aria-labelledby="k-title" hidden>
-    <div class="scrim" data-close></div>
-    <div class="sheet small-sheet">
-      <header class="settings-head">
-        <h2 id="k-title" class="heading-6" data-i18n="shortcuts">Shortcuts</h2>
-        <button type="button" class="icon-btn" data-close aria-label="Close"><i class="ph ph-x"></i></button>
-      </header>
-      <dl class="keys">
-        <div><dt><kbd class="kbd">Esc</kbd></dt><dd data-i18n="kEsc">Close the top window, player or trailer</dd></div>
-        <div><dt><kbd class="kbd">F</kbd></dt><dd data-i18n="kF">Fullscreen player</dd></div>
-        <div><dt><kbd class="kbd">/</kbd></dt><dd data-i18n="kSlash">Focus search</dd></div>
-        <div><dt><kbd class="kbd">← ↑ → ↓</kbd></dt><dd data-i18n="kArrows">Move between cards and buttons</dd></div>
-        <div><dt><kbd class="kbd">N</kbd> <kbd class="kbd">P</kbd></dt><dd data-i18n="kNP">Next or previous episode in the player</dd></div>
-      </dl>
-    </div>
-  </div>
-
-  <!-- ============================== MAINTENANCE (z-80) ============================== -->
-  <div id="maintenance" class="layer layer-maint" role="alertdialog" aria-labelledby="m-title" hidden>
-    <div class="backdrop-art"></div>
-    <div class="maint-box">
-      <span class="wordmark wordmark-xl" aria-hidden="true"><span class="wm-anime">ANIME</span><span class="wm-loft">LOFT</span></span>
-      <h2 id="m-title" class="heading-5" data-i18n="maintTitle">We are tuning the loft</h2>
-      <p id="m-msg" class="body-6"></p>
-      <div class="row-btns center">
-        <button type="button" id="m-retry" class="btn btn-primary"><i class="ph ph-arrow-clockwise"></i><span data-i18n="retry">Try again</span></button>
-        <a class="btn btn-discord" data-discord href="https://discord.gg/3qeKkseWSs" target="_blank" rel="noopener noreferrer"><i class="ph ph-discord-logo"></i>Discord</a>
-        <a class="btn btn-secondary" data-github href="https://github.com/iam0din6-art/AnimeLoft" target="_blank" rel="noopener noreferrer"><i class="ph ph-github-logo"></i>GitHub</a>
-      </div>
-    </div>
-  </div>
-
-  <!-- ============================== ONBOARDING (z-90) ============================== -->
-  <div id="onboarding" class="layer layer-onboard" role="dialog" aria-modal="true" aria-labelledby="o-title" hidden>
-    <div class="backdrop-art"></div>
-    <div class="onboard-box">
-      <span class="wordmark wordmark-xl" aria-hidden="true"><span class="wm-anime">ANIME</span><span class="wm-loft">LOFT</span></span>
-      <h2 id="o-title" class="heading-4 hero-grad balance" data-i18n="deviceQ">Which device are you using?</h2>
-      <p class="body-6 muted pretty" data-i18n="deviceSub">We tune layout, card size and focus for it. You can change this later in Settings.</p>
-      <div class="device-cards" role="radiogroup">
-        <button type="button" class="device-card" data-pick-device="pc"><span class="device-emoji" aria-hidden="true">🖥️</span><span class="title-3" data-i18n="devicePc">Computer</span><span class="caption-5 muted">PC · Mac · Laptop</span></button>
-        <button type="button" class="device-card" data-pick-device="tv"><span class="device-emoji" aria-hidden="true">📺</span><span class="title-3" data-i18n="deviceTv">Smart TV / Console</span><span class="caption-5 muted">Remote · Gamepad</span></button>
-        <button type="button" class="device-card" data-pick-device="mobile"><span class="device-emoji" aria-hidden="true">📱</span><span class="title-3" data-i18n="deviceMobile">Phone / Tablet</span><span class="caption-5 muted">Touch</span></button>
-      </div>
-      <label class="onboard-lang"><i class="ph ph-translate" aria-hidden="true"></i><span class="sr-only">Language</span>
-        <select id="o-lang" class="field field-sm"></select></label>
-    </div>
-  </div>
-
-  <script src="i18n.js" defer></script>
-  <script src="app.js" defer></script>
-    <script src="i18n.js" defer></script>
-  <script src="app.js" defer></script>
-  <script src="mascot.js" defer></script> <!-- ADICIONE ESTA LINHA -->
-</body>
-</html>
+function initApp() {
+  qsa('[data-github]').forEach((a) => { a.href = GITHUB_URL; });
+  bindEvents();
+  if (!location.hash) location.hash = '#/home';
+  route();
+}
+document.addEventListener('DOMContentLoaded', initApp);
