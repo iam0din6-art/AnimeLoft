@@ -2,7 +2,8 @@
   "version": 4,
   "maintenance": false,
   "message": {
-    "pt": "Estamos melhorando o Anime Loft. Volte em alguns minutos."
+    "pt": "Estamos melhorando o Anime Loft. Volte em alguns minutos.",
+    "en": "We are improving Anime Loft. Please come back in a few minutes."
   },
   "servers": [
     {
