@@ -20,17 +20,16 @@ window.LoftMascot = {
       txt = '';
     }
     
-    // Se a tradução falhar, usa o fallback em PT
-    if (!txt || txt === this.lines[this.idx]) {
+    // NOVO TEXTO: Explicativo, sobre open source, players de terceiros e anúncios.
+    if (!txt || txt === this.lines[this.idx] || this.lines[this.idx] === 'tipAdblock') {
       if (this.lines[this.idx] === 'tipAdblock') {
-        txt = 'O Anime Loft não tem fins lucrativos e não exibe anúncios. Use AdBlock ou o navegador Brave para ajudar.';
+        txt = 'O Anime Loft é um projeto de código aberto (open source). Nós não hospedamos vídeos; usamos players de terceiros que podem exibir anúncios. Para uma navegação limpa, recomendamos usar o <b>AdBlock</b> ou o navegador <b>Brave</b>.';
       } else {
         txt = 'Oi, eu sou a Yuki.';
       }
     }
 
-    // Transforma as palavras "AdBlock" e "Brave" em links
-    // Usamos replace com regex para pegar as palavras e criar a tag <a>
+    // Transforma "AdBlock" e "Brave" em links clicáveis
     txt = txt.replace(/(AdBlock|Brave)/gi, (match) => {
       const url = match.toLowerCase() === 'adblock' 
         ? 'https://getadblock.com/' 
@@ -38,7 +37,6 @@ window.LoftMascot = {
       return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color: var(--sky-300); text-decoration: underline;">${match}</a>`;
     });
 
-    // Usa innerHTML em vez de textContent para renderizar os links
     el.innerHTML = txt;
   },
 
@@ -51,19 +49,14 @@ window.LoftMascot = {
     } catch (e) {}
   },
 
-  // NOVA FUNÇÃO: Recomendar um anime aleatório
   recommend: function() {
     if (!window.LoftMascot) return;
     
-    // Mostra que está carregando
     const el = document.getElementById('mascot-say');
     if (el) el.textContent = 'Buscando um anime para você...';
 
-    // Query para pegar um anime aleatório bem avaliado
-    // Usamos a API do AniList que o site já usa
     const query = `query { Page(page: 1, perPage: 50) { media(type: ANIME, sort: POPULARITY_DESC, averageScore_greater: 75, isAdult: false) { id title { romaji english } } } }`;
     
-    // Usa a função gql que já existe no app.js
     if (typeof gql === 'function') {
       gql(query)
         .then(data => {
@@ -72,12 +65,10 @@ window.LoftMascot = {
             const randomAnime = list[Math.floor(Math.random() * list.length)];
             const title = randomAnime.title.english || randomAnime.title.romaji;
             
-            // Abre o detalhe do anime usando a função do app.js
             if (typeof openDetail === 'function') {
               openDetail(randomAnime.id);
             }
             
-            // Fala o nome do anime
             if (el) el.textContent = `Que tal assistir "${title}"?`;
           } else {
             if (el) el.textContent = 'Não encontrei nenhum anime agora.';
