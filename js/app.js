@@ -170,7 +170,37 @@ async function runSearch(q) { q = q.trim(); $('search-h').textContent = t('searc
 const onSearchInput = debounce((q) => { q = q.trim(); if (q.length < 2) return; const hash = '#/search?q=' + encodeURIComponent(q); if (state.view === 'search') { history.replaceState(history.state, '', hash); route(); } else location.hash = hash; }, 420);
 
 const BROWSE_QUERY = `query($page: Int, $season: MediaSeason, $seasonYear: Int, $startDate_greater: FuzzyDateInt, $startDate_lesser: FuzzyDateInt, $format: MediaFormat, $genre: String, $sort: [MediaSort], $adult: Boolean) { Page(page: $page, perPage: 30) { pageInfo { hasNextPage total } media(type: ANIME, season: $season, seasonYear: $seasonYear, startDate_greater: $startDate_greater, startDate_lesser: $startDate_lesser, format: $format, genre: $genre, sort: $sort, isAdult: $adult) { ${MEDIA_FIELDS} } } }`;
-function buildFilterSelects() { const yearSel = $('f-year'); if (!yearSel) return; const keepYear = yearSel.value; const now = new Date().getFullYear() + 5; let html = `<option value="">${esc(t('any'))}</option>`; for (let y = now; y >= 1960; y--) html += `<option value="${y}">${y}</option>`; yearSel.innerHTML = html; yearSel.value = keepYear; const genreSel = $('f-genre'); if (!genreSel) return; const keepGenre = genreSel.value; const genres = state.genres.filter((g) => state.nsfw || g !== 'Hentai'); genreSel.innerHTML = `<option value="">${esc(t('any'))}</option>` + genres.map((g) => `<option value="${esc(g)}">${esc(g)}</option>`).join(''); genreSel.value = genres.includes(keepGenre) ? keepGenre : ''; const chips = $('genre-chips'); if (chips) chips.innerHTML = QUICK_GENRES.map((g) => `<button type="button" class="chip" data-genre="${esc(g)}" aria-pressed="${genreSel.value === g}">${esc(g)}</button>`).join(''); }
+function buildFilterSelects() { 
+  const yearSel = $('f-year'); 
+  if (!yearSel) return; 
+  const keepYear = yearSel.value; 
+  const now = new Date().getFullYear() + 5; 
+  let html = `<option value="">${esc(t('any'))}</option>`; 
+  for (let y = now; y >= 1960; y--) html += `<option value="${y}">${y}</option>`; 
+  yearSel.innerHTML = html; 
+  yearSel.value = keepYear;
+
+  const genreSel = $('f-genre'); 
+  if (!genreSel) return; 
+  const keepGenre = genreSel.value; 
+  
+  // AQUI ESTÁ O PULO DO GATO: Adicionamos o "Hentai" manualmente à lista se o modo +18 estiver ligado.
+  let genres = [...state.genres];
+  if (state.nsfw && !genres.includes('Hentai')) {
+    genres.push('Hentai');
+  }
+  
+  // Se o modo +18 estiver desligado, garantimos que "Hentai" não apareça.
+  if (!state.nsfw) {
+    genres = genres.filter((g) => g !== 'Hentai');
+  }
+
+  genreSel.innerHTML = `<option value="">${esc(t('any'))}</option>` + genres.map((g) => `<option value="${esc(g)}">${esc(g)}</option>`).join(''); 
+  genreSel.value = genres.includes(keepGenre) ? keepGenre : '';
+  
+  const chips = $('genre-chips'); 
+  if (chips) chips.innerHTML = QUICK_GENRES.map((g) => `<button type="button" class="chip" data-genre="${esc(g)}" aria-pressed="${genreSel.value === g}">${esc(g)}</button>`).join(''); 
+}
 async function loadGenres() { try { const d = await gql('{ GenreCollection }', {}, { persist: 7 * 24 * 3600 * 1000 }); if (Array.isArray(d.GenreCollection) && d.GenreCollection.length) { state.genres = d.GenreCollection; buildFilterSelects(); } } catch (e) {} }
 function browseVars(page) { const year = Number($('f-year').value) || null; const season = $('f-season').value || null; const format = $('f-format').value || null; const genre = $('f-genre').value || null; const sortValue = $('f-sort').value || 'POPULARITY_DESC'; const vars = { page, sort: [sortValue] }; const adult = adultVar(); if (adult !== undefined) vars.adult = adult; if (format) vars.format = format; if (genre) vars.genre = genre; if (season && year) { vars.season = season; vars.seasonYear = year; } else if (year) { vars.startDate_greater = year * 10000; vars.startDate_lesser = (year + 1) * 10000; } else if (season) { vars.season = season; } return vars; }
 async function loadBrowse(reset) { const b = state.browse; if (reset) { b.page = 1; b.seq++; b.ok = false; } const seq = b.seq; const grid = $('browse-grid'); const more = $('browse-more'); if (reset) grid.innerHTML = skeletonCards(18); b.loading = true; more.disabled = true; try { const vars = browseVars(b.page); const data = await gql(BROWSE_QUERY, vars); if (seq !== b.seq) { b.loading = false; return; } const pageInfo = data.Page.pageInfo; const list = remember(data.Page.media); b.hasNext = pageInfo.hasNextPage; $('browse-count').textContent = t('titles', { n: (pageInfo.total || 0).toLocaleString(state.lang) }); if (reset) grid.innerHTML = list.length ? list.map((m) => cardHTML(m)).join('') : emptyHTML('ph-magnifying-glass', t('noResults')); else if (list.length) grid.insertAdjacentHTML('beforeend', list.map((m) => cardHTML(m)).join('')); more.hidden = !b.hasNext; b.ok = true; } catch (e) { if (reset && seq === b.seq) grid.innerHTML = errorHTML(() => loadBrowse(true), e); else { if (!reset) b.page = Math.max(1, b.page - 1); toast(t('loadErr'), { type: 'error' }); } } finally { b.loading = false; more.disabled = false; } }
