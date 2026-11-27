@@ -3,16 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Anime Loft</title>
+  <title>Anime Loft · open source anime streaming</title>
   <meta name="description" content="Anime Loft is an open source anime catalog and player.">
   <meta name="theme-color" content="#061521">
+  <meta name="color-scheme" content="dark light">
+
   <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="48x48" href="assets/favicon-48.png">
   <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://graphql.anilist.co" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Metal+Mania&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
   <link rel="stylesheet" href="style.css">
+
   <script>
     (function () {
       try {
@@ -23,25 +30,28 @@
     })();
   </script>
 </head>
-<body>
 
+<body>
   <!-- NAVBAR -->
   <header id="navbar" class="navbar">
     <nav class="nav-inner" aria-label="Main">
       <a href="#/home" class="brand" id="brand" aria-label="Anime Loft home">
         <span class="wordmark"><span class="wm-anime">ANIME</span><span class="wm-loft">LOFT</span></span>
       </a>
+
       <div class="nav-tabs" aria-label="Sections">
         <a class="nav-tab" href="#/home" data-view="home"><span data-i18n="home">Início</span></a>
         <a class="nav-tab" href="#/browse" data-view="browse"><span data-i18n="browse">Explorar</span></a>
         <a class="nav-tab" href="#/list" data-view="list"><span data-i18n="myList">Minha Lista</span></a>
       </div>
+
       <form id="search-form" class="nav-search" role="search">
         <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
         <label for="search-input" class="sr-only" data-i18n="searchPh">Buscar anime</label>
         <input id="search-input" type="search" autocomplete="off" enterkeyhint="search" data-i18n-ph="searchPh" placeholder="Buscar anime...">
         <kbd class="kbd hide-touch">/</kbd>
       </form>
+
       <div class="nav-actions">
         <button id="btn-search-mobile" type="button" class="icon-btn show-mobile" aria-label="Search"><i class="ph ph-magnifying-glass"></i></button>
         <button id="btn-surprise" type="button" class="icon-btn" data-i18n-title="surprise" title="Surpreenda-me"><i class="ph ph-shuffle"></i></button>
@@ -89,7 +99,7 @@
     <section id="view-search" class="view wrap" data-view-panel="search" hidden aria-labelledby="search-h">
       <div class="page-head">
         <h1 id="search-h" class="heading-4"></h1>
-        <button type="button" class="btn btn-secondary" id="search-clear"><i class="ph ph-x"></i><span data-i18n="clear">Limpar</span></button>
+        <button type="button" class="btn btn-ghost" id="search-clear"><i class="ph ph-x"></i><span data-i18n="clear">Limpar</span></button>
       </div>
       <div id="search-grid" class="grid"></div>
     </section>
@@ -185,7 +195,7 @@
     <button type="button" id="mascot-avatar" class="mascot-avatar" aria-label="Yuki Nagato" aria-expanded="true"><i class="ph ph-book-open-text"></i></button>
   </aside>
 
-  <!-- DETAIL MODAL (AQUI ESTAVA O ERRO - AGORA ESTÁ COMPLETO) -->
+  <!-- DETAIL MODAL -->
   <div id="detail" class="layer layer-detail" role="dialog" aria-modal="true" aria-labelledby="d-title" hidden>
     <div class="scrim" data-close></div>
     <article class="sheet detail-sheet">
@@ -231,7 +241,7 @@
     </article>
   </div>
 
-  <!-- PLAYER MODAL (AQUI ESTAVA O ERRO - AGORA ESTÁ COMPLETO) -->
+  <!-- PLAYER MODAL -->
   <div id="player" class="layer layer-player" role="dialog" aria-modal="true" aria-labelledby="p-title" hidden>
     <div class="player-shell" id="player-shell">
       <header class="player-top">
@@ -313,6 +323,10 @@
               <div><span class="body-5" data-i18n="nsfw">Mostrar títulos +18</span><p class="caption-5 muted" data-i18n="nsfwHint">Títulos adultos ficam ocultos do catálogo até que você ative.</p></div>
               <input type="checkbox" id="s-nsfw" class="switch" role="switch">
             </li>
+            <li class="toggle-row">
+              <div><span class="body-5" data-i18n="privacy">Modo privado</span><p class="caption-5 muted" data-i18n="privacyHint">Esconder "Continuar assistindo" da tela inicial.</p></div>
+              <input type="checkbox" id="s-privacy" class="switch" role="switch">
+            </li>
           </ul>
         </section>
         <section class="set-group">
@@ -322,9 +336,39 @@
             <button type="button" id="s-clear-cache" class="btn btn-secondary btn-sm"><i class="ph ph-broom"></i><span data-i18n="clearCache">Limpar cache</span></button>
           </div>
         </section>
+        <section class="set-group set-community">
+          <h3 class="title-4 set-h"><i class="ph ph-users-three"></i><span data-i18n="community">Comunidade Open Source</span></h3>
+          <div class="row-btns">
+            <a class="btn btn-secondary btn-sm" data-github href="#" target="_blank" rel="noopener noreferrer"><i class="ph ph-github-logo"></i>GitHub</a>
+            <a class="btn btn-discord btn-sm" data-discord href="#" target="_blank" rel="noopener noreferrer"><i class="ph ph-discord-logo"></i>Discord</a>
+          </div>
+          <p class="caption-5 muted" id="s-version"></p>
+        </section>
       </div>
     </div>
   </div>
+
+  <!-- SHORTCUTS -->
+  <div id="shortcuts" class="layer layer-settings" role="dialog" aria-modal="true" aria-labelledby="k-title" hidden>
+    <div class="scrim" data-close></div>
+    <div class="sheet small-sheet">
+      <header class="settings-head">
+        <h2 id="k-title" class="heading-6" data-i18n="shortcuts">Atalhos</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Close"><i class="ph ph-x"></i></button>
+      </header>
+      <dl class="keys" style="padding: 24px;">
+        <div><dt><kbd class="kbd">Esc</kbd></dt><dd data-i18n="kEsc">Fechar janela</dd></div>
+        <div><dt><kbd class="kbd">F</kbd></dt><dd data-i18n="kF">Tela cheia</dd></div>
+        <div><dt><kbd class="kbd">/</kbd></dt><dd data-i18n="kSlash">Buscar</dd></div>
+        <div><dt><kbd class="kbd">← ↑ → ↓</kbd></dt><dd data-i18n="kArrows">Navegar</dd></div>
+        <div><dt><kbd class="kbd">N</kbd> <kbd class="kbd">P</kbd></dt><dd data-i18n="kNP">Próximo/Anterior</dd></div>
+      </dl>
+    </div>
+  </div>
+
+  <!-- MANUTENÇÃO E ONBOARDING (Ocultos por padrão, mas essenciais) -->
+  <div id="maintenance" class="layer layer-maint" role="alertdialog" hidden><div class="backdrop-art"></div></div>
+  <div id="onboarding" class="layer layer-onboard" role="dialog" hidden><div class="backdrop-art"></div></div>
 
   <script src="js/i18n.js"></script>
   <script src="js/app.js"></script>
