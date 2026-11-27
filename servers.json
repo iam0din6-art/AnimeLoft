@@ -1,40 +1,34 @@
 {
-  "version": 3,
+  "version": 4,
   "maintenance": false,
   "message": {
-    "pt": "Estamos melhorando o Anime Loft. Volte em alguns minutos.",
-    "en": "We are improving Anime Loft. Please come back in a few minutes.",
-    "es": "Estamos mejorando Anime Loft. Vuelve en unos minutos.",
-    "bn": "আমরা Anime Loft উন্নত করছি। কয়েক মিনিট পরে আবার আসুন।"
+    "pt": "Estamos melhorando o Anime Loft. Volte em alguns minutos."
   },
   "servers": [
     {
-      "id": "megaplay",
-      "label": "MegaPlay (AniList)",
+      "id": "megaplay_ani",
+      "label": "MegaPlay (Principal)",
       "type": "embed",
       "enabled": true,
+      "priority": 1,
       "url": "https://megaplay.buzz/stream/ani/{anilistId}/{ep}/{audio}"
     },
     {
-      "id": "megaplaymal",
-      "label": "MegaPlay (MAL)",
-      "type": "embed",
-      "enabled": true,
-      "url": "https://megaplay.buzz/stream/mal/{malId}/{ep}/{audio}"
-    },
-    {
-      "id": "animeembed",
-      "label": "AnimeEmbed (Multi-Sub)",
-      "type": "embed",
-      "enabled": true,
-      "url": "https://animeembed.com/embed/ani/{anilistId}/{ep}"
-    },
-    {
       "id": "vidlink",
-      "label": "VidLink Pro",
+      "label": "VidLink (Backup)",
       "type": "embed",
       "enabled": true,
+      "priority": 2,
       "url": "https://vidlink.pro/anime/{malId}/{ep}/{audio}?fallback=true"
+    },
+    {
+      "id": "hanime_ext",
+      "label": "Hanime (+18 Externo)",
+      "type": "external",
+      "enabled": true,
+      "priority": 1,
+      "adult": true,
+      "url": "https://hanime.tv/search?q={title}"
     }
   ]
 }
