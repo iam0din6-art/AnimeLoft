@@ -4,15 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Anime Loft · open source anime streaming</title>
-  <meta name="description" content="Anime Loft is an open source anime catalog and player. Browse AniList, watch with your favorite stream provider, keep favorites and history on your own device.">
+  <meta name="description" content="Anime Loft is an open source anime catalog and player.">
   <meta name="theme-color" content="#061521">
   <meta name="color-scheme" content="dark light">
-
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="Anime Loft">
-  <meta property="og:description" content="Open source anime catalog and player. Every season, every story.">
-  <meta property="og:image" content="assets/og.png">
-  <meta name="twitter:card" content="summary_large_image">
 
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="48x48" href="assets/favicon-48.png">
@@ -24,9 +18,9 @@
   <link rel="preconnect" href="https://graphql.anilist.co" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Metal+Mania&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
-  <link rel="stylesheet" href="style.css">
+  
+  <link rel="stylesheet" href="css/style.css">
 
-  <!-- Apply saved theme/device before first paint so nothing flashes -->
   <script>
     (function () {
       try {
@@ -41,7 +35,6 @@
 <body>
   <a class="skip-link" href="#app-main" data-i18n="skip">Skip to content</a>
 
-  <!-- ============================== NAVBAR (z-40) ============================== -->
   <header id="navbar" class="navbar">
     <nav class="nav-inner" aria-label="Main">
       <a href="#/home" class="brand" id="brand" aria-label="Anime Loft home">
@@ -57,6 +50,7 @@
       <div class="nav-tabs" aria-label="Sections">
         <a class="nav-tab" href="#/home" data-view="home"><i class="ph ph-house" aria-hidden="true"></i><span data-i18n="home">Home</span></a>
         <a class="nav-tab" href="#/browse" data-view="browse"><i class="ph ph-funnel-simple" aria-hidden="true"></i><span data-i18n="browse">Browse</span></a>
+        <a class="nav-tab" href="#/manga" data-view="manga"><i class="ph ph-book-open" aria-hidden="true"></i><span data-i18n="manga">Mangás</span></a>
         <a class="nav-tab" href="#/list" data-view="list"><i class="ph ph-bookmarks-simple" aria-hidden="true"></i><span data-i18n="myList">My list</span></a>
       </div>
 
@@ -86,22 +80,19 @@
     </nav>
   </header>
 
-  <!-- Bottom tab bar for phones -->
   <nav id="tabbar" class="tabbar" aria-label="Sections">
     <a class="tab-item" href="#/home" data-view="home"><i class="ph ph-house"></i><span data-i18n="home">Home</span></a>
     <a class="tab-item" href="#/browse" data-view="browse"><i class="ph ph-funnel-simple"></i><span data-i18n="browse">Browse</span></a>
+    <a class="tab-item" href="#/manga" data-view="manga"><i class="ph ph-book-open"></i><span data-i18n="manga">Mangás</span></a>
     <a class="tab-item" href="#/list" data-view="list"><i class="ph ph-bookmarks-simple"></i><span data-i18n="myList">My list</span></a>
     <button class="tab-item" type="button" data-open-settings><i class="ph ph-gear-six"></i><span data-i18n="settings">Settings</span></button>
   </nav>
 
-  <!-- ============================== MAIN ============================== -->
   <main id="app-main" tabindex="-1">
-
     <!-- HOME -->
     <section id="view-home" class="view" data-view-panel="home" aria-labelledby="home-h">
       <h1 id="home-h" class="sr-only">Anime Loft</h1>
       <div id="hero" class="hero" aria-roledescription="carousel" aria-label="Featured"></div>
-
       <div class="wrap stack-rows">
         <section id="row-continue" class="row" hidden>
           <div class="row-head">
@@ -112,7 +103,6 @@
         </section>
         <div id="home-rows"></div>
       </div>
-
       <section class="tagline wrap" aria-label="Tagline">
         <p id="tagline-text" class="tagline-text"></p>
       </section>
@@ -133,44 +123,50 @@
         <h1 id="browse-h" class="heading-4" data-i18n="browseTitle">Categories and filters</h1>
         <span id="browse-count" class="caption-4 muted" aria-live="polite"></span>
       </div>
-
       <form id="filters" class="filters" aria-label="Filters">
-        <label class="field-wrap"><span class="caption-3" data-i18n="year">Year</span>
-          <select id="f-year" class="field"></select></label>
+        <label class="field-wrap"><span class="caption-3" data-i18n="year">Year</span><select id="f-year" class="field"></select></label>
         <label class="field-wrap"><span class="caption-3" data-i18n="season">Season</span>
           <select id="f-season" class="field">
-            <option value="" data-i18n="any">Any</option>
-            <option value="WINTER" data-i18n="WINTER">Winter</option>
-            <option value="SPRING" data-i18n="SPRING">Spring</option>
-            <option value="SUMMER" data-i18n="SUMMER">Summer</option>
-            <option value="FALL" data-i18n="FALL">Fall</option>
+            <option value="" data-i18n="any">Any</option><option value="WINTER" data-i18n="WINTER">Winter</option><option value="SPRING" data-i18n="SPRING">Spring</option><option value="SUMMER" data-i18n="SUMMER">Summer</option><option value="FALL" data-i18n="FALL">Fall</option>
           </select></label>
         <label class="field-wrap"><span class="caption-3" data-i18n="format">Format</span>
           <select id="f-format" class="field">
-            <option value="" data-i18n="any">Any</option>
-            <option value="TV">TV</option>
-            <option value="MOVIE" data-i18n="MOVIE">Movie</option>
-            <option value="OVA">OVA</option>
-            <option value="ONA">ONA</option>
-            <option value="SPECIAL" data-i18n="SPECIAL">Special</option>
-            <option value="TV_SHORT" data-i18n="TV_SHORT">TV short</option>
+            <option value="" data-i18n="any">Any</option><option value="TV">TV</option><option value="MOVIE" data-i18n="MOVIE">Movie</option><option value="OVA">OVA</option><option value="ONA">ONA</option><option value="SPECIAL" data-i18n="SPECIAL">Special</option><option value="TV_SHORT" data-i18n="TV_SHORT">TV short</option>
           </select></label>
-        <label class="field-wrap"><span class="caption-3" data-i18n="genre">Genre</span>
-          <select id="f-genre" class="field"></select></label>
+        <label class="field-wrap"><span class="caption-3" data-i18n="genre">Genre</span><select id="f-genre" class="field"></select></label>
         <label class="field-wrap"><span class="caption-3" data-i18n="sort">Sort by</span>
           <select id="f-sort" class="field">
-            <option value="POPULARITY_DESC" data-i18n="sortPopular">Most popular</option>
-            <option value="TRENDING_DESC" data-i18n="sortTrending">Trending</option>
-            <option value="SCORE_DESC" data-i18n="sortScore">Highest rated</option>
-            <option value="START_DATE_DESC" data-i18n="sortNewest">Newest</option>
-            <option value="FAVOURITES_DESC" data-i18n="sortFavs">Most favorited</option>
+            <option value="POPULARITY_DESC" data-i18n="sortPopular">Most popular</option><option value="TRENDING_DESC" data-i18n="sortTrending">Trending</option><option value="SCORE_DESC" data-i18n="sortScore">Highest rated</option><option value="START_DATE_DESC" data-i18n="sortNewest">Newest</option><option value="FAVOURITES_DESC" data-i18n="sortFavs">Most favorited</option>
           </select></label>
         <button type="reset" class="btn btn-ghost field-reset"><i class="ph ph-arrow-counter-clockwise"></i><span data-i18n="reset">Reset</span></button>
       </form>
-
       <div id="genre-chips" class="chips" role="group" aria-label="Quick genres"></div>
       <div id="browse-grid" class="grid"></div>
       <div class="center-pad"><button id="browse-more" type="button" class="btn btn-secondary" hidden><span data-i18n="loadMore">Load more</span></button></div>
+    </section>
+
+    <!-- NOVA SEÇÃO: MANGA / MANHWA -->
+    <section id="view-manga" class="view wrap" data-view-panel="manga" hidden aria-labelledby="manga-h">
+      <div class="page-head">
+        <h1 id="manga-h" class="heading-4" data-i18n="mangaTitle">Mangás e Manhwas</h1>
+        <span id="manga-count" class="caption-4 muted" aria-live="polite"></span>
+      </div>
+      <form id="manga-filters" class="filters" aria-label="Manga Filters">
+        <label class="field-wrap"><span class="caption-3" data-i18n="format">Formato</span>
+          <select id="m-format" class="field">
+            <option value="" data-i18n="any">Qualquer</option><option value="MANGA">Mangá (Japonês)</option><option value="MANHWA">Manhwa (Coreano)</option><option value="MANHUA">Manhua (Chinês)</option><option value="NOVEL">Light Novel</option>
+          </select>
+        </label>
+        <label class="field-wrap"><span class="caption-3" data-i18n="genre">Gênero</span><select id="m-genre" class="field"></select></label>
+        <label class="field-wrap"><span class="caption-3" data-i18n="sort">Ordenar por</span>
+          <select id="m-sort" class="field">
+            <option value="POPULARITY_DESC" data-i18n="sortPopular">Mais populares</option><option value="TRENDING_DESC" data-i18n="sortTrending">Em alta</option><option value="SCORE_DESC" data-i18n="sortScore">Mais bem avaliados</option>
+          </select>
+        </label>
+        <button type="reset" class="btn btn-ghost field-reset"><i class="ph ph-arrow-counter-clockwise"></i><span data-i18n="reset">Redefinir</span></button>
+      </form>
+      <div id="manga-grid" class="grid"></div>
+      <div class="center-pad"><button id="manga-more" type="button" class="btn btn-secondary" hidden><span data-i18n="loadMore">Carregar mais</span></button></div>
     </section>
 
     <!-- MY LIST -->
@@ -179,7 +175,6 @@
         <h1 id="list-h" class="heading-4" data-i18n="myList">My list</h1>
         <span id="list-sync" class="caption-4 muted"></span>
       </div>
-
       <section class="list-block" aria-labelledby="lc-h">
         <div class="row-head">
           <h2 id="lc-h" class="heading-6"><i class="ph ph-play-circle"></i> <span data-i18n="continueWatching">Continue watching</span></h2>
@@ -187,14 +182,10 @@
         </div>
         <div id="list-continue" class="continue-list"></div>
       </section>
-
       <section class="list-block" aria-labelledby="lf-h">
-        <div class="row-head">
-          <h2 id="lf-h" class="heading-6"><i class="ph ph-heart"></i> <span data-i18n="favorites">Favorites</span></h2>
-        </div>
+        <div class="row-head"><h2 id="lf-h" class="heading-6"><i class="ph ph-heart"></i> <span data-i18n="favorites">Favorites</span></h2></div>
         <div id="list-favs" class="grid"></div>
       </section>
-
       <section id="list-anilist" class="list-block" hidden aria-labelledby="la-h">
         <div class="row-head">
           <h2 id="la-h" class="heading-6"><i class="ph ph-cloud-check"></i> <span data-i18n="anilistLists">From your AniList</span></h2>
@@ -206,7 +197,7 @@
 
     <footer class="footer wrap">
       <a href="#/home" class="wordmark wordmark-sm" aria-label="Anime Loft"><span class="wm-anime">ANIME</span><span class="wm-loft">LOFT</span></a>
-      <p class="body-6 muted" data-i18n="footNote">Anime Loft is open source. It hosts no video files; streams come from third party providers and catalog data from AniList.</p>
+      <p class="body-6 muted" data-i18n="footNote">Anime Loft is open source.</p>
       <div class="footer-links">
         <a data-github href="https://github.com/iam0din6-art/AnimeLoft" target="_blank" rel="noopener noreferrer"><i class="ph ph-github-logo"></i> GitHub</a>
         <a data-discord href="https://discord.gg/3qeKkseWSs" target="_blank" rel="noopener noreferrer"><i class="ph ph-discord-logo"></i> Discord</a>
@@ -216,7 +207,6 @@
     </footer>
   </main>
 
-  <!-- ============================== MASCOT (z-40) ============================== -->
   <aside id="mascot" class="mascot" aria-label="Yuki Nagato assistant">
     <div class="mascot-bubble" id="mascot-bubble">
       <button type="button" id="mascot-min" class="mascot-x" aria-label="Minimize"><i class="ph ph-minus"></i></button>
@@ -231,7 +221,6 @@
     <button type="button" id="mascot-avatar" class="mascot-avatar" aria-label="Yuki Nagato" aria-expanded="true"><i class="ph ph-book-open-text"></i></button>
   </aside>
 
-  <!-- ============================== DETAIL MODAL (z-50) ============================== -->
   <div id="detail" class="layer layer-detail" role="dialog" aria-modal="true" aria-labelledby="d-title" hidden>
     <div class="scrim" data-close></div>
     <article class="sheet detail-sheet">
@@ -257,10 +246,8 @@
             </div>
           </div>
         </div>
-
         <p id="d-desc" class="body-6 d-desc pretty"></p>
         <div id="d-genres" class="chips chips-static"></div>
-
         <section class="d-section" aria-labelledby="d-eps-h">
           <div class="row-head">
             <h3 id="d-eps-h" class="heading-6" data-i18n="episodes">Episodes</h3>
@@ -271,12 +258,10 @@
           </div>
           <div id="d-episodes" class="ep-grid"></div>
         </section>
-
         <section class="d-section" id="d-rel-wrap" hidden aria-labelledby="d-rel-h">
           <h3 id="d-rel-h" class="heading-6" data-i18n="related">Related and recommended</h3>
           <div class="rail rail-sm" id="d-related"></div>
         </section>
-
         <section class="d-section" aria-labelledby="d-rev-h">
           <h3 id="d-rev-h" class="heading-6" data-i18n="reviews">Community reviews</h3>
           <form id="review-form" class="review-form" novalidate>
@@ -296,7 +281,6 @@
     </article>
   </div>
 
-  <!-- ============================== PLAYER MODAL (z-60) ============================== -->
   <div id="player" class="layer layer-player" role="dialog" aria-modal="true" aria-labelledby="p-title" hidden>
     <div class="player-shell" id="player-shell">
       <header class="player-top">
@@ -307,30 +291,19 @@
         </div>
         <button type="button" id="p-fullscreen" class="icon-btn" aria-label="Fullscreen (F)" title="Fullscreen (F)"><i class="ph ph-corners-out"></i></button>
       </header>
-
       <div class="stage" id="stage">
         <iframe id="embed-player" title="Video player" allow="autoplay; fullscreen; encrypted-media; picture-in-picture; clipboard-write" allowfullscreen referrerpolicy="origin"></iframe>
-        <div id="stage-loading" class="stage-overlay">
-          <div class="skeleton stage-skel"></div>
-          <p class="body-5" data-i18n="loadingPlayer">Loading player</p>
-        </div>
-        <div id="stage-hint" class="stage-hint" hidden>
-          <p class="body-5" data-i18n="playerHint">Black screen? Switch servers or open the direct player.</p>
-        </div>
+        <div id="stage-loading" class="stage-overlay"><div class="skeleton stage-skel"></div><p class="body-5" data-i18n="loadingPlayer">Loading player</p></div>
+        <div id="stage-hint" class="stage-hint" hidden><p class="body-5" data-i18n="playerHint">Black screen? Switch servers or open the direct player.</p></div>
       </div>
-
       <div class="player-bar" role="toolbar" aria-label="Player controls">
         <div class="pbar-group">
           <button type="button" id="p-prev" class="btn btn-secondary btn-sm"><i class="ph ph-skip-back"></i><span class="hide-mobile" data-i18n="prev">Previous</span></button>
-          <label class="pbar-ep"><span class="sr-only" data-i18n="episode">Episode</span>
-            <select id="p-episode" class="field field-sm"></select></label>
+          <label class="pbar-ep"><span class="sr-only" data-i18n="episode">Episode</span><select id="p-episode" class="field field-sm"></select></label>
           <button type="button" id="p-next" class="btn btn-primary btn-sm"><span data-i18n="next">Next episode</span><i class="ph ph-skip-forward"></i></button>
         </div>
         <div class="pbar-group">
-          <div class="seg" id="p-audio" role="radiogroup" aria-label="Audio">
-            <button type="button" data-audio="sub" role="radio">SUB</button>
-            <button type="button" data-audio="dub" role="radio">DUB</button>
-          </div>
+          <div class="seg" id="p-audio" role="radiogroup" aria-label="Audio"><button type="button" data-audio="sub" role="radio">SUB</button><button type="button" data-audio="dub" role="radio">DUB</button></div>
           <button type="button" id="p-reload" class="btn btn-secondary btn-sm"><i class="ph ph-arrow-clockwise"></i><span data-i18n="reload">Reload</span></button>
           <a id="p-direct" class="btn btn-secondary btn-sm" target="_blank" rel="noopener noreferrer"><i class="ph ph-rocket-launch"></i><span data-i18n="openDirect">Open direct player</span></a>
         </div>
@@ -342,7 +315,6 @@
     </div>
   </div>
 
-  <!-- ============================== TRAILER (z-65) ============================== -->
   <div id="trailer" class="layer layer-trailer" role="dialog" aria-modal="true" aria-label="Trailer" hidden>
     <div class="scrim" data-close></div>
     <div class="trailer-box">
@@ -351,10 +323,8 @@
     </div>
   </div>
 
-  <!-- ============================== TOASTS (z-70) ============================== -->
   <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
 
-  <!-- ============================== SETTINGS (z-75) ============================== -->
   <div id="settings" class="layer layer-settings" role="dialog" aria-modal="true" aria-labelledby="s-title" hidden>
     <div class="scrim" data-close></div>
     <div class="sheet settings-sheet">
@@ -364,7 +334,6 @@
         <button type="button" class="icon-btn" data-close aria-label="Close"><i class="ph ph-x"></i></button>
       </header>
       <div class="settings-body">
-
         <section class="set-group">
           <h3 class="title-4 set-h"><i class="ph ph-devices"></i><span data-i18n="device">Device</span></h3>
           <div class="seg seg-wide" id="s-device" role="radiogroup">
@@ -373,7 +342,6 @@
             <button type="button" data-device="mobile" role="radio"><i class="ph ph-device-mobile"></i><span data-i18n="deviceMobile">Phone / Tablet</span></button>
           </div>
         </section>
-
         <section class="set-group">
           <h3 class="title-4 set-h"><i class="ph ph-palette"></i><span data-i18n="theme">Theme</span></h3>
           <div class="theme-cards" id="s-theme" role="radiogroup">
@@ -382,45 +350,29 @@
             <button type="button" data-theme-opt="sky" role="radio"><span class="swatch sw-sky"></span><span data-i18n="themeSky">Sky light</span></button>
           </div>
         </section>
-
         <section class="set-group">
           <h3 class="title-4 set-h"><i class="ph ph-translate"></i><span data-i18n="language">Language</span></h3>
           <select id="s-lang" class="field" aria-label="Language"></select>
         </section>
-
         <section class="set-group">
           <h3 class="title-4 set-h"><i class="ph ph-hard-drives"></i><span data-i18n="providers">Stream providers</span></h3>
-          <label class="field-wrap"><span class="caption-3" data-i18n="defaultServer">Default server</span>
-            <select id="s-default-server" class="field"></select></label>
+          <label class="field-wrap"><span class="caption-3" data-i18n="defaultServer">Default server</span><select id="s-default-server" class="field"></select></label>
           <ul id="s-servers" class="toggle-list"></ul>
         </section>
-
         <section class="set-group">
           <h3 class="title-4 set-h"><i class="ph ph-shield-check"></i><span data-i18n="content">Content and privacy</span></h3>
           <ul class="toggle-list">
-            <li class="toggle-row">
-              <div><span class="body-5" data-i18n="nsfw">Show 18+ titles</span><p class="caption-5 muted" data-i18n="nsfwHint">Adult titles stay hidden from the catalog unless you turn this on.</p></div>
-              <input type="checkbox" id="s-nsfw" class="switch" role="switch">
-            </li>
-            <li class="toggle-row">
-              <div><span class="body-5" data-i18n="privacy">Privacy mode</span><p class="caption-5 muted" data-i18n="privacyHint">Hide Continue watching from the home screen.</p></div>
-              <input type="checkbox" id="s-privacy" class="switch" role="switch">
-            </li>
+            <li class="toggle-row"><div><span class="body-5" data-i18n="nsfw">Show 18+ titles</span><p class="caption-5 muted" data-i18n="nsfwHint">Adult titles stay hidden from the catalog unless you turn this on.</p></div><input type="checkbox" id="s-nsfw" class="switch" role="switch"></li>
+            <li class="toggle-row"><div><span class="body-5" data-i18n="privacy">Privacy mode</span><p class="caption-5 muted" data-i18n="privacyHint">Hide Continue watching from the home screen.</p></div><input type="checkbox" id="s-privacy" class="switch" role="switch"></li>
           </ul>
         </section>
-
         <section class="set-group">
           <h3 class="title-4 set-h"><i class="ph ph-cloud"></i>AniList</h3>
           <p class="caption-5 muted" id="s-al-hint"></p>
-          <label class="field-wrap"><span class="caption-3" data-i18n="clientId">Client ID</span>
-            <input id="s-client-id" class="field" inputmode="numeric" autocomplete="off" placeholder="12345"></label>
+          <label class="field-wrap"><span class="caption-3" data-i18n="clientId">Client ID</span><input id="s-client-id" class="field" inputmode="numeric" autocomplete="off" placeholder="12345"></label>
           <p class="caption-5 muted"><span data-i18n="redirectIs">Redirect URL to register:</span> <code id="s-redirect"></code></p>
-          <div class="row-btns">
-            <button type="button" id="s-al-login" class="btn btn-primary btn-sm"><i class="ph ph-sign-in"></i><span data-i18n="login">Sign in</span></button>
-            <button type="button" id="s-al-logout" class="btn btn-ghost btn-sm" hidden><i class="ph ph-sign-out"></i><span data-i18n="logout">Sign out</span></button>
-          </div>
+          <div class="row-btns"><button type="button" id="s-al-login" class="btn btn-primary btn-sm"><i class="ph ph-sign-in"></i><span data-i18n="login">Sign in</span></button><button type="button" id="s-al-logout" class="btn btn-ghost btn-sm" hidden><i class="ph ph-sign-out"></i><span data-i18n="logout">Sign out</span></button></div>
         </section>
-
         <section class="set-group">
           <h3 class="title-4 set-h"><i class="ph ph-database"></i><span data-i18n="data">Your data</span></h3>
           <div class="row-btns">
@@ -429,7 +381,6 @@
             <button type="button" id="s-shortcuts" class="btn btn-ghost btn-sm"><i class="ph ph-keyboard"></i><span data-i18n="shortcuts">Shortcuts</span></button>
           </div>
         </section>
-
         <section class="set-group set-community">
           <h3 class="title-4 set-h"><i class="ph ph-users-three"></i><span data-i18n="community">Open source community</span></h3>
           <div class="row-btns">
@@ -442,7 +393,6 @@
     </div>
   </div>
 
-  <!-- Keyboard shortcuts sheet (shares settings layer level) -->
   <div id="shortcuts" class="layer layer-settings" role="dialog" aria-modal="true" aria-labelledby="k-title" hidden>
     <div class="scrim" data-close></div>
     <div class="sheet small-sheet">
@@ -460,7 +410,6 @@
     </div>
   </div>
 
-  <!-- ============================== MAINTENANCE (z-80) ============================== -->
   <div id="maintenance" class="layer layer-maint" role="alertdialog" aria-labelledby="m-title" hidden>
     <div class="backdrop-art"></div>
     <div class="maint-box">
@@ -475,7 +424,6 @@
     </div>
   </div>
 
-  <!-- ============================== ONBOARDING (z-90) ============================== -->
   <div id="onboarding" class="layer layer-onboard" role="dialog" aria-modal="true" aria-labelledby="o-title" hidden>
     <div class="backdrop-art"></div>
     <div class="onboard-box">
@@ -487,15 +435,13 @@
         <button type="button" class="device-card" data-pick-device="tv"><span class="device-emoji" aria-hidden="true">📺</span><span class="title-3" data-i18n="deviceTv">Smart TV / Console</span><span class="caption-5 muted">Remote · Gamepad</span></button>
         <button type="button" class="device-card" data-pick-device="mobile"><span class="device-emoji" aria-hidden="true">📱</span><span class="title-3" data-i18n="deviceMobile">Phone / Tablet</span><span class="caption-5 muted">Touch</span></button>
       </div>
-      <label class="onboard-lang"><i class="ph ph-translate" aria-hidden="true"></i><span class="sr-only">Language</span>
-        <select id="o-lang" class="field field-sm"></select></label>
+      <label class="onboard-lang"><i class="ph ph-translate" aria-hidden="true"></i><span class="sr-only">Language</span><select id="o-lang" class="field field-sm"></select></label>
     </div>
   </div>
 
-  <script src="i18n.js" defer></script>
-  <script src="app.js" defer></script>
-    <script src="i18n.js" defer></script>
-  <script src="app.js" defer></script>
-  <script src="mascot.js" defer></script> <!-- ADICIONE ESTA LINHA -->
+  <script src="js/i18n.js" defer></script>
+  <script src="js/app.js" defer></script>
+  <script src="js/mascot.js" defer></script>
+  <script src="js/manga.js" defer></script>
 </body>
 </html>
