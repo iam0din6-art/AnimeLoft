@@ -14,8 +14,6 @@ window.LoftMascot = {
     if (!el) return;
 
     let txt = '';
-
-    // Se for a mensagem do Adblock, usa o texto exato que queremos, ignorando o i18n.js
     if (this.lines[this.idx] === 'tipAdblock') {
       txt = 'O Anime Loft é open source e não tem anúncios. Os players de terceiros podem exibir ads. Use <b>AdBlock</b> ou <b>Brave</b> para bloquear!';
     } else {
@@ -29,7 +27,6 @@ window.LoftMascot = {
       }
     }
 
-    // Transforma as palavras em links
     txt = txt.replace(/(AdBlock|Brave)/gi, (match) => {
       const url = match.toLowerCase() === 'adblock' 
         ? 'https://getadblock.com/' 
