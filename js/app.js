@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '3.0.0';
+const APP_VERSION = '3.1.0';
 const ANILIST_API = 'https://graphql.anilist.co';
 const GITHUB_URL = 'https://github.com/iam0din6-art/AnimeLoft';
 const DISCORD_URL = 'https://discord.gg/3qeKkseWSs';
@@ -20,11 +20,12 @@ const K = {
 };
 
 const DEFAULT_SERVERS = { 
-  version: 3, 
+  version: 4, 
   maintenance: false, 
   message: { en: 'We are improving Anime Loft.' }, 
   servers: [
-    { id: 'megaplay', label: 'MegaPlay', type: 'embed', enabled: true, url: 'https://megaplay.buzz/stream/ani/{anilistId}/{ep}/{audio}' }
+    { id: 'megaplay_ani', label: 'MegaPlay', type: 'embed', enabled: true, priority: 1, url: 'https://megaplay.buzz/stream/ani/{anilistId}/{ep}/{audio}' },
+    { id: 'hanime_ext', label: 'Hanime (+18)', type: 'external', enabled: true, priority: 1, adult: true, url: 'https://hanime.tv/search?q={title}' }
   ] 
 };
 
@@ -317,17 +318,40 @@ function submitReview(e) { e.preventDefault(); const m = state.detail; if (!m) r
 function orderedServers(isAdult = false) {
   const prefs = state.prefs;
   let list = state.config.servers.filter((s) => 
-    s.type === 'embed' && s.enabled !== false && prefs.enabled[s.id] !== false &&
+    s.enabled !== false && 
+    prefs.enabled[s.id] !== false &&
     (isAdult ? s.adult === true : s.adult !== true)
   );
+  
+  list.sort((a, b) => (a.priority || 99) - (b.priority || 99));
+  
   if (isAdult && list.length === 0) {
-    list = [{ id: 'hanime_ext', label: 'Hanime (+18 externo)', type: 'external', adult: true, url: 'https://hanime.tv/' }];
+    list = [{ id: 'hanime_ext', label: 'Hanime (+18 Externo)', type: 'external', adult: true, url: 'https://hanime.tv/search?q={title}' }];
   }
+  
   const i = prefs.default ? list.findIndex((s) => s.id === prefs.default) : -1;
   if (i > 0) list.unshift(list.splice(i, 1)[0]);
   return list;
 }
-function embedUrl(server, anime, ep, audio) { const ctx = { anilistId: anime.id, malId: anime.idMal, ep, audio, dub: audio === 'dub' ? 1 : 0 }; let missing = false; const url = String(server.url || '').replace(/\{(\w+)\}/g, (_, k) => { const v = ctx[k]; if (v == null || v === '') { missing = true; return ''; } return encodeURIComponent(v); }); return missing || !/^https?:\/\//.test(url) ? null : url; }
+
+function embedUrl(server, anime, ep, audio) { 
+  const ctx = { 
+    anilistId: anime.id, 
+    malId: anime.idMal, 
+    ep, 
+    audio, 
+    dub: audio === 'dub' ? 1 : 0,
+    title: encodeURIComponent(titleOf(anime)) 
+  }; 
+  let missing = false; 
+  const url = String(server.url || '').replace(/\{(\w+)\}/g, (_, k) => { 
+    const v = ctx[k]; 
+    if (v == null || v === '') { missing = true; return ''; } 
+    return encodeURIComponent(v); 
+  }); 
+  return missing || !/^https?:\/\//.test(url) ? null : url; 
+}
+
 function playableEpisode(m, wanted) { const released = releasedEpisodes(m); return Math.min(Math.max(1, wanted || 1), Math.max(1, released)); }
 async function playAnime(id) { try { const m = await getMedia(id); if (releasedEpisodes(m) < 1) { toast(t('noEpisodes')); openDetail(id); return; } const c = getContinue()[id]; openPlayer(m, playableEpisode(m, c ? c.ep : 1)); } catch (e) { toast(t('loadErr'), { type: 'error' }); } }
 function startEpisode(n) { if (state.detail) openPlayer(state.detail, n); }
@@ -342,26 +366,31 @@ function openPlayer(anime, ep) {
   openLayer('player', '#p-next'); 
   paintPlayerChrome(); 
   
+  const list = orderedServers(isAdult);
+  if (!list.length) { 
+    toast(t('noServer'), { type: 'error', action: { label: t('settings'), run: () => openLayer('settings') } }); 
+    return; 
+  }
+
   if (isAdult) {
+    const extServer = list.find(s => s.type === 'external') || list[0];
+    const adultUrl = embedUrl(extServer, anime, ep, audio) || `https://hanime.tv/search?q=${encodeURIComponent(titleOf(anime))}`;
+    
     $('stage-adult').hidden = false;
     $('embed-player').style.display = 'none';
     $('stage-loading').style.display = 'none';
     $('stage-hint').style.display = 'none';
-    $('p-adult-link').href = `https://hanime.tv/search?q=${encodeURIComponent(titleOf(anime))}`;
+    $('p-adult-link').href = adultUrl;
     return;
   }
 
   $('stage-adult').hidden = true;
   $('embed-player').style.display = 'block';
   
-  const list = orderedServers(isAdult);
-  if (!list.length) { 
-    toast(t('noServer'), { type: 'error', action: { label: t('settings'), run: () => openLayer('settings') } }); 
-    return; 
-  }
   state.player.server = list[0].id;
   loadStream(); 
 }
+
 function loadStream() { const p = state.player; if (!p || p.anime.isAdult) return; clearTimeout(state.hintTimer); $('stage-hint').hidden = true; const overlay = $('stage-loading'); overlay.classList.remove('gone'); const frame = $('embed-player'); const list = orderedServers(); let start = list.findIndex((s) => s.id === p.server); if (start < 0) start = 0; let warned = false; for (let i = 0; i < list.length; i++) { const s = list[(start + i) % list.length]; const url = embedUrl(s, p.anime, p.ep, p.audio); if (!url) { if (!warned) { toast(t('serverSkip', { s: s.label })); warned = true; } continue; } p.server = s.id; p.url = url; frame.src = url; $('p-direct').href = url; paintPlayerChrome(); state.hintTimer = setTimeout(() => { overlay.classList.add('gone'); $('stage-hint').hidden = false; }, EMBED_TIMEOUT_MS); return; } overlay.classList.add('gone'); frame.src = 'about:blank'; $('p-direct').removeAttribute('href'); toast(t('noServer'), { type: 'error' }); paintPlayerChrome(); }
 function stopPlayer() { clearTimeout(state.hintTimer); $('embed-player').src = 'about:blank'; state.player = null; $('stage-hint').hidden = true; $('stage-loading').classList.remove('gone'); if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {}); renderContinueRail(); if (state.view === 'list') renderList(); if (state.detail) renderDetail(state.detail); }
 function paintPlayerChrome() { const p = state.player; if (!p) return; const total = totalEpisodes(p.anime); const released = releasedEpisodes(p.anime); $('p-title').textContent = titleOf(p.anime); $('p-sub').textContent = `${t('episode')} ${p.ep}${total ? ' / ' + total : ''}`; const sel = $('p-episode'); const max = Math.max(released, p.ep); const sig = `${p.anime.id}:${max}`; if (sel.dataset.sig !== sig) { sel.innerHTML = Array.from({ length: max }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join(''); sel.dataset.sig = sig; } sel.value = String(p.ep); qsa('#p-audio [data-audio]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.audio === p.audio))); const servers = orderedServers(p.anime.isAdult); const box = $('p-servers'); const ssig = servers.map((s) => s.id).join('|'); if (box.dataset.sig !== ssig) { box.innerHTML = servers.map((s) => `<button type="button" class="srv" role="radio" data-srv="${esc(s.id)}">${esc(s.label)}</button>`).join(''); box.dataset.sig = ssig; } qsa('.srv', box).forEach((b) => b.setAttribute('aria-checked', String(b.dataset.srv === p.server))); $('p-prev').disabled = p.ep <= 1; }
@@ -388,7 +417,7 @@ function detectDevice() { const ua = navigator.userAgent || ''; if (/SMART-TV|Sm
 function setDevice(mode, { persist = true } = {}) { if (!['pc', 'tv', 'mobile'].includes(mode)) mode = 'pc'; state.device = mode; document.documentElement.dataset.device = mode; if (persist) lsSet(K.device, mode); paintSettings(); }
 function pickDevice(mode) { setDevice(mode); closeLayer('onboarding'); }
 function setTheme(name) { if (!['dark', 'oled', 'sky'].includes(name)) name = 'dark'; state.theme = name; document.documentElement.dataset.theme = name; lsSet(K.theme, name); const meta = document.querySelector('meta[name="theme-color"]'); const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(); if (meta && bg) meta.setAttribute('content', bg); paintSettings(); }
-function paintSettings() { qsa('#s-device button[data-device]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.device === state.device))); qsa('#s-theme [data-theme-opt]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.themeOpt === state.theme))); if ($('s-lang')) $('s-lang').value = state.lang; if ($('s-nsfw')) $('s-nsfw').checked = state.nsfw; if ($('s-privacy')) $('s-privacy').checked = state.privacy; const embeds = state.config.servers.filter((s) => s.type === 'embed' && s.enabled !== false); if ($('s-default-server')) { $('s-default-server').innerHTML = embeds.map((s) => `<option value="${esc(s.id)}">${esc(s.label)}</option>`).join(''); $('s-default-server').value = state.prefs.default && embeds.some((s) => s.id === state.prefs.default) ? state.prefs.default : (embeds[0] ? embeds[0].id : ''); } if ($('s-servers')) { $('s-servers').innerHTML = embeds.map((s) => { let host = ''; try { host = new URL(s.url.replace(/\{\w+\}/g, '1')).hostname; } catch (e) {} return `<li class="toggle-row"><div><span class="body-5">${esc(s.label)}</span><p class="caption-5 muted">${esc(host)}</p></div><input type="checkbox" class="switch" role="switch" data-srv-toggle="${esc(s.id)}" ${state.prefs.enabled[s.id] === false ? '' : 'checked'}></li>`; }).join(''); } if ($('s-al-hint')) $('s-al-hint').textContent = t('alHint'); if ($('s-client-id')) $('s-client-id').value = lsGet(K.clientId) || CONFIG.anilistClientId || ''; if ($('s-redirect')) $('s-redirect').textContent = location.origin + location.pathname; if ($('s-al-login')) $('s-al-login').hidden = Boolean(state.viewer); if ($('s-al-logout')) $('s-al-logout').hidden = !state.viewer; if ($('s-version')) $('s-version').textContent = t('version', { v: APP_VERSION }); }
+function paintSettings() { qsa('#s-device button[data-device]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.device === state.device))); qsa('#s-theme [data-theme-opt]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.themeOpt === state.theme))); if ($('s-lang')) $('s-lang').value = state.lang; if ($('s-nsfw')) $('s-nsfw').checked = state.nsfw; if ($('s-privacy')) $('s-privacy').checked = state.privacy; const embeds = state.config.servers.filter((s) => s.enabled !== false); if ($('s-default-server')) { $('s-default-server').innerHTML = embeds.map((s) => `<option value="${esc(s.id)}">${esc(s.label)}</option>`).join(''); $('s-default-server').value = state.prefs.default && embeds.some((s) => s.id === state.prefs.default) ? state.prefs.default : (embeds[0] ? embeds[0].id : ''); } if ($('s-servers')) { $('s-servers').innerHTML = embeds.map((s) => { let host = ''; try { host = new URL(s.url.replace(/\{\w+\}/g, '1')).hostname; } catch (e) {} return `<li class="toggle-row"><div><span class="body-5">${esc(s.label)}</span><p class="caption-5 muted">${esc(host)}</p></div><input type="checkbox" class="switch" role="switch" data-srv-toggle="${esc(s.id)}" ${state.prefs.enabled[s.id] === false ? '' : 'checked'}></li>`; }).join(''); } if ($('s-al-hint')) $('s-al-hint').textContent = t('alHint'); if ($('s-client-id')) $('s-client-id').value = lsGet(K.clientId) || CONFIG.anilistClientId || ''; if ($('s-redirect')) $('s-redirect').textContent = location.origin + location.pathname; if ($('s-al-login')) $('s-al-login').hidden = Boolean(state.viewer); if ($('s-al-logout')) $('s-al-logout').hidden = !state.viewer; if ($('s-version')) $('s-version').textContent = t('version', { v: APP_VERSION }); }
 function savePrefs() { lsSetJSON(K.servers, state.prefs); }
 function resetCatalog() { homeData = null; if ($('browse-grid')) $('browse-grid').innerHTML = ''; buildFilterSelects(); route(); }
 function clearHistory() { lsDel(K.cont); lsDel(K.watched); renderContinueRail(); if (state.view === 'list') renderList(); if (state.detail) renderDetail(state.detail); toast(t('historyCleared'), { type: 'ok' }); }
@@ -404,7 +433,7 @@ function closeAccountMenu() { if ($('account-menu')) $('account-menu').hidden = 
 function onAccountClick() { if (!state.viewer) { startLogin(); return; } const open = $('account-menu').hidden; $('account-menu').hidden = !open; $('btn-account').setAttribute('aria-expanded', String(open)); }
 
 // Manutenção
-function validateConfig(cfg) { if (!cfg || typeof cfg !== 'object' || !Array.isArray(cfg.servers)) return null; const servers = cfg.servers.filter((s) => s && /^[\w-]+$/.test(s.id || '') && typeof s.label === 'string' && s.type === 'embed' && /^https?:\/\//.test(s.url || '')); if (!servers.length) return null; return { version: cfg.version || 1, maintenance: cfg.maintenance === true, message: cfg.message || null, servers }; }
+function validateConfig(cfg) { if (!cfg || typeof cfg !== 'object' || !Array.isArray(cfg.servers)) return null; const servers = cfg.servers.filter((s) => s && /^[\w-]+$/.test(s.id || '') && typeof s.label === 'string' && /^https?:\/\//.test(s.url || '')); if (!servers.length) return null; return { version: cfg.version || 1, maintenance: cfg.maintenance === true, message: cfg.message || null, servers }; }
 function pickMessage(msg) { if (!msg) return ''; if (typeof msg === 'string') return msg; return msg[state.lang] || msg.en || Object.values(msg)[0] || ''; }
 function showMaintenance(message) { $('m-msg').textContent = pickMessage(message) || pickMessage(DEFAULT_SERVERS.message); openLayer('maintenance', '#m-retry'); clearInterval(state.maintTimer); state.maintTimer = setInterval(loadServersConfig, 60000); }
 function hideMaintenance() { clearInterval(state.maintTimer); closeLayer('maintenance'); }
