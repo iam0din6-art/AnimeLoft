@@ -1,16 +1,17 @@
 'use strict';
 
 window.LoftMascot = {
-  idx: 0,
-  timer: null,
+  idx: 1, // Começa no 1 para forçar a mensagem do Adblock
   lines: ['mascotHi', 'tipAdblock', 'tipDiscord', 'tipGithub', 'tip1', 'tip2', 'tip3', 'tip4'],
   initialized: false,
+  timer: null,
 
-  // Repinta a fala atual. Se repaint=true, NÃO avança o índice.
   say: function(repaint) {
+    // Se não for repaint, avança a fala
     if (!repaint) {
       this.idx = (this.idx + 1) % this.lines.length;
     }
+    
     const el = document.getElementById('mascot-say');
     if (!el) return;
 
@@ -20,11 +21,14 @@ window.LoftMascot = {
     } catch (e) {
       txt = '';
     }
-    // Fallback se a tradução falhar
+    
+    // Fallback de segurança caso o i18n falhe
     if (!txt || txt === this.lines[this.idx]) {
-      txt = this.lines[this.idx] === 'tipAdblock'
-        ? 'O Anime Loft não tem fins lucrativos e não exibe anúncios. Use AdBlock ou o navegador Brave para ajudar.'
-        : (typeof t === 'function' ? t('mascotHi') : 'Oi, eu sou a Yuki.');
+      if (this.lines[this.idx] === 'tipAdblock') {
+        txt = 'O Anime Loft não tem fins lucrativos e não exibe anúncios. Use AdBlock ou o navegador Brave para ajudar.';
+      } else {
+        txt = 'Oi, eu sou a Yuki.';
+      }
     }
     el.textContent = txt;
   },
@@ -32,45 +36,31 @@ window.LoftMascot = {
   toggle: function() {
     const m = document.getElementById('mascot');
     if (!m) return;
+    
+    // Se estiver minimizada, abre. Se estiver aberta, minimiza.
     m.classList.toggle('min');
+    
+    // Salva a preferência no navegador
     try {
       localStorage.setItem('loft_mascot_min', m.classList.contains('min') ? '1' : '0');
     } catch (e) {}
   },
 
   detectAdblock: function() {
-    // Brave sempre bloqueia por padrão
+    // Se for o navegador Brave, já sabemos que bloqueia anúncios por padrão
     if (navigator.brave) return Promise.resolve(true);
 
     return new Promise((resolve) => {
-      // Bait mais robusto: usa um script real de ads conhecido
       const bait = document.createElement('div');
       bait.className = 'ad-banner adsbox pub_300x250';
       bait.style.cssText = 'position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;';
       document.body.appendChild(bait);
-
-      // Também testa fetch de um script de anúncio comum
-      let blockedByFetch = false;
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 800);
-
-      fetch('https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js', {
-        method: 'HEAD',
-        mode: 'no-cors',
-        signal: controller.signal
-      }).then(() => {
-        clearTimeout(timeout);
-        // Se chegou aqui, não foi bloqueado
-      }).catch(() => {
-        clearTimeout(timeout);
-        blockedByFetch = true;
-      });
-
+      
       setTimeout(() => {
-        const blockedByBait = bait.offsetParent === null || bait.offsetHeight === 0;
+        const blocked = bait.offsetParent === null || bait.offsetHeight === 0;
         bait.remove();
-        resolve(blockedByBait || blockedByFetch);
-      }, 350);
+        resolve(blocked);
+      }, 200);
     });
   },
 
@@ -78,36 +68,17 @@ window.LoftMascot = {
     if (this.initialized) return;
     this.initialized = true;
 
-    // Restaura estado minimizado salvo
+    // 1. Restaura o estado minimizado salvo
     try {
       const min = localStorage.getItem('loft_mascot_min');
       const m = document.getElementById('mascot');
       if (min === '1' && m) m.classList.add('min');
     } catch (e) {}
 
-    // Fala inicial: saudação + aviso de adblock/brave
-    this.idx = 0;
+    // 2. Mostra a fala do AdBlock imediatamente
     this.say(true);
 
-    // NÃO troca de fala automaticamente.
-    // A troca só acontece quando o usuário clica no avatar (via handler no app.js).
-    // O handler atual do app.js já chama LoftMascot.toggle() no clique.
-    // Para trocar a fala ao clicar, descomente a linha abaixo e ajuste o app.js:
-    // document.getElementById('mascot-avatar')?.addEventListener('click', () => this.say());
-
-    // Se não tiver Adblock, mostra o aviso do adblock no boot
-    try {
-      const blocked = await this.detectAdblock();
-      if (!blocked) {
-        const el = document.getElementById('mascot-say');
-        if (el && typeof t === 'function') {
-          el.textContent = t('tipAdblock');
-        }
-        this.idx = 1; // Próxima troca manual será a saudação de novo ou outra dica
-      }
-    } catch (e) {}
-
-    // Busca a foto da Yuki no AniList (com cache e silencioso)
+    // 3. Busca a foto da Yuki no AniList (com cache para não sobrecarregar)
     try {
       if (typeof gql === 'function') {
         const d = await gql(
@@ -127,7 +98,7 @@ window.LoftMascot = {
         }
       }
     } catch (e) {
-      // Silencioso: se falhar, mantém o ícone padrão
+      // Se falhar a busca da foto, não faz nada e mantém o ícone padrão
     }
   }
 };
