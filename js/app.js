@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '3.0.0';
 const ANILIST_API = 'https://graphql.anilist.co';
 const GITHUB_URL = 'https://github.com/iam0din6-art/AnimeLoft';
 const DISCORD_URL = 'https://discord.gg/3qeKkseWSs';
@@ -50,19 +50,10 @@ const I18N = window.LOFT_I18N || { languages: [{ code: 'en', name: 'English', di
 function t(key, vars) { const dict = I18N.strings[state.lang] || {}; let s = dict[key]; if (s == null) s = (I18N.strings.en || {})[key]; if (s == null) s = key; if (vars) s = s.replace(/\{(\w+)\}/g, (_, k) => (vars[k] != null ? vars[k] : '')); return s; }
 function detectLang() { const saved = lsGet(K.lang); const codes = I18N.languages ? I18N.languages.map((l) => l.code) : ['en']; if (saved && codes.includes(saved)) return saved; const nav = (navigator.language || 'en').split('-')[0]; return codes.includes(nav) ? nav : 'pt'; }
 function applyI18n(root = document) { qsa('[data-i18n]', root).forEach((el) => { el.textContent = t(el.dataset.i18n); }); qsa('[data-i18n-ph]', root).forEach((el) => { el.placeholder = t(el.dataset.i18nPh); }); qsa('[data-i18n-title]', root).forEach((el) => { el.title = t(el.dataset.i18nTitle); el.setAttribute('aria-label', t(el.dataset.i18nTitle)); }); qsa('[data-i18n-aria]', root).forEach((el) => { el.setAttribute('aria-label', t(el.dataset.i18nAria)); }); }
-function fillLangSelects() { 
-  ['s-lang', 'o-lang'].forEach((id) => { 
-    const sel = $(id); 
-    if (!sel) return; 
-    sel.innerHTML = I18N.languages.map(l => `<option value="${l.code}">${l.name}</option>`).join(''); 
-    sel.value = state.lang; 
-  }); 
-}
+function fillLangSelects() { ['s-lang', 'o-lang'].forEach((id) => { const sel = $(id); if (!sel) return; sel.innerHTML = I18N.languages.map(l => `<option value="${l.code}">${l.name}</option>`).join(''); sel.value = state.lang; }); }
 
 function setLang(code, { rerender = true, persist = true } = {}) {
-  state.lang = code; 
-  if (persist) lsSet(K.lang, code); 
-  document.documentElement.lang = code;
+  state.lang = code; if (persist) lsSet(K.lang, code); document.documentElement.lang = code;
   const langData = I18N.languages.find(l => l.code === code);
   document.documentElement.dir = (langData && langData.dir) ? langData.dir : 'ltr';
   applyI18n(); fillLangSelects();
@@ -173,12 +164,12 @@ const HOME_ROWS = [
   { key: 'upcoming', label: 'rowUpcoming' },
   { key: 'movies', label: 'rowMovies' }
 ];
-function rowShell(id, label) { return `<section class="row" aria-labelledby="h-${id}"><div class="row-head"><h2 class="heading-5" id="h-${id}">${esc(t(label))}</h2></div><div class="rail" id="rail-${id}">${skeletonCards(8)}</div></section>`; }
+function rowShell(id, label) { return `<section class="row" aria-labelledby="h-${id}"><div class="row-head"><h2 class="heading-6" id="h-${id}">${esc(t(label))}</h2></div><div class="rail" id="rail-${id}">${skeletonCards(8)}</div></section>`; }
 let homeData = null;
 async function loadHome(force = false) { 
   renderContinueRail(); 
   if (homeData && !force) { paintHome(); return; } 
-  $('hero').innerHTML = '<div class="skeleton" aria-hidden="true"></div>'; 
+  $('hero').innerHTML = '<div class="skeleton" aria-hidden="true" style="height:100%;border-radius:0;"></div>'; 
   $('home-rows').innerHTML = HOME_ROWS.map((r) => rowShell(r.key, r.label)).join(''); 
   
   const cur = currentSeason(0); 
@@ -197,8 +188,14 @@ async function loadHome(force = false) {
   } 
 }
 function paintHome() { if (!homeData) return; const featured = homeData.trending.media.filter((m) => m.bannerImage).slice(0, 6); renderHero(featured.length ? featured : homeData.trending.media.slice(0, 6)); $('home-rows').innerHTML = HOME_ROWS.map((r) => rowShell(r.key, r.label)).join(''); HOME_ROWS.forEach((r) => { const list = homeData[r.key].media; $('rail-' + r.key).innerHTML = list.length ? list.map((m) => cardHTML(m)).join('') : emptyHTML('ph-calendar-blank', t('noResults')); }); state.homeLoaded = true; }
-function renderHero(items) { state.hero.items = items; state.hero.index = 0; if (!items.length) { $('hero').innerHTML = ''; return; } const slides = items.map((m, i) => { const desc = stripHtml(m.description || ''); const meta = [fmtLabel(m.format), m.seasonYear, m.episodes ? t('eps', { n: m.episodes }) : '', m.averageScore ? `★ ${(m.averageScore / 10).toFixed(1)}` : ''].filter(Boolean); return `<div class="hero-slide${i === 0 ? ' on' : ''}" data-i="${i}" aria-roledescription="slide" aria-label="${i + 1} / ${items.length}"${i === 0 ? '' : ' aria-hidden="true"'}><img src="${esc(m.bannerImage || coverOf(m))}" alt="" ${i === 0 ? 'fetchpriority="high"' : 'loading="lazy"'}><div class="hero-copy"><div class="hero-meta">${meta.map((x) => `<span class="badge">${esc(x)}</span>`).join('')}</div><h2 class="heading-2 hero-grad clamp-2">${esc(titleOf(m))}</h2>${desc ? `<p class="body-6 hero-desc clamp-2">${esc(desc)}</p>` : ''}<div class="hero-ctas"><button type="button" class="btn btn-primary" data-play="${m.id}" ${i === 0 ? '' : 'tabindex="-1"'}><i class="ph-fill ph-play"></i>${esc(t('watchNow'))}</button><button type="button" class="btn btn-secondary" data-open="${m.id}" ${i === 0 ? '' : 'tabindex="-1"'}><i class="ph ph-info"></i>${esc(t('details'))}</button></div></div></div>`; }).join(''); const dots = items.map((_, i) => `<button type="button" class="hero-dot${i === 0 ? ' on' : ''}" data-dot="${i}" aria-label="Slide ${i + 1}"></button>`).join(''); $('hero').innerHTML = `<div class="hero-stage" id="hero-stage">${slides}<div class="hero-dots">${dots}</div></div>`; const stage = $('hero-stage'); stage.addEventListener('mouseenter', stopHero); stage.addEventListener('mouseleave', startHero); stage.addEventListener('focusin', stopHero); stage.addEventListener('focusout', startHero); startHero(); }
-function heroGo(i) { const n = state.hero.items.length; if (!n) return; state.hero.index = (i + n) % n; qsa('.hero-slide').forEach((s, k) => { const on = k === state.hero.index; s.classList.toggle('on', on); if (on) s.removeAttribute('aria-hidden'); else s.setAttribute('aria-hidden', 'true'); qsa('button', s).forEach((b) => { if (on) b.removeAttribute('tabindex'); else b.setAttribute('tabindex', '-1'); }); }); qsa('.hero-dot').forEach((d, k) => { d.classList.remove('on'); if (k === state.hero.index) { void d.offsetWidth; d.classList.add('on'); } }); startHero(); }
+function renderHero(items) { state.hero.items = items; state.hero.index = 0; if (!items.length) { $('hero').innerHTML = ''; return; } const slides = items.map((m, i) => { const desc = stripHtml(m.description || ''); const meta = [fmtLabel(m.format), m.seasonYear, m.episodes ? t('eps', { n: m.episodes }) : '', m.averageScore ? `★ ${(m.averageScore / 10).toFixed(1)}` : ''].filter(Boolean); return `<div class="hero-slide${i === 0 ? ' on' : ''}" data-i="${i}" aria-roledescription="slide" aria-label="${i + 1} / ${items.length}"${i === 0 ? '' : ' aria-hidden="true"'}><img src="${esc(m.bannerImage || coverOf(m))}" alt="" ${i === 0 ? 'fetchpriority="high"' : 'loading="lazy"'}></div>`; }).join(''); const dots = items.map((_, i) => `<button type="button" class="hero-dot${i === 0 ? ' on' : ''}" data-dot="${i}" aria-label="Slide ${i + 1}"></button>`).join(''); $('hero').innerHTML = `<div class="hero-stage" id="hero-stage">${slides}</div><div class="hero-copy"><div class="hero-slide on" style="position:relative; background:transparent;">${items.map((m, i) => `<div class="hero-content-${i}" style="display:${i===0?'flex':'none'}; flex-direction:column; gap:16px;"><h2 class="heading-2">${esc(titleOf(m))}</h2><div class="hero-meta">${meta.map((x) => `<span>${esc(x)}</span>`).join('<span>•</span>')}</div><p class="hero-desc">${esc(desc)}</p><div class="hero-ctas"><button type="button" class="btn-hero-primary" data-play="${m.id}"><i class="ph-fill ph-play"></i> ${esc(t('watchNow'))}</button><button type="button" class="btn-hero-secondary" data-open="${m.id}"><i class="ph ph-info"></i> ${esc(t('details'))}</button></div></div>`).join('')}</div></div>`; startHero(); }
+
+function heroGo(i) { 
+  const n = state.hero.items.length; if (!n) return; state.hero.index = (i + n) % n; 
+  qsa('.hero-slide').forEach((s, k) => s.classList.toggle('on', k === state.hero.index)); 
+  qsa('[class^="hero-content-"]').forEach((c, k) => c.style.display = k === state.hero.index ? 'flex' : 'none');
+  startHero(); 
+}
 function startHero() { stopHero(); if (state.view !== 'home' || state.hero.items.length < 2 || reduceMotion()) return; state.hero.timer = setTimeout(() => heroGo(state.hero.index + 1), HERO_INTERVAL); }
 function stopHero() { clearTimeout(state.hero.timer); state.hero.timer = null; }
 
@@ -213,9 +210,9 @@ function getFavs() { return lsJSON(K.favs, []); }
 function isFav(id) { return getFavs().some((f) => f.id === id); }
 function toggleFav(m) { let favs = getFavs(); const on = !favs.some((f) => f.id === m.id); if (on) favs.unshift({ id: m.id, title: m.title, coverImage: { large: coverOf(m), color: m.coverImage && m.coverImage.color }, format: m.format, seasonYear: m.seasonYear, episodes: m.episodes, averageScore: m.averageScore, status: m.status, isAdult: m.isAdult }); else favs = favs.filter((f) => f.id !== m.id); lsSetJSON(K.favs, favs); toast(t(on ? 'favAdded' : 'favRemoved'), { type: 'ok' }); return on; }
 
-function cwCardHTML(c, { wide = false } = {}) { const pct = c.duration ? Math.min(1, c.time / c.duration) : (c.total ? Math.min(1, c.ep / c.total) : 0); const time = c.time ? ` · ${fmtTime(c.time)}` : ''; return `<div class="cw-card${wide ? ' wide' : ''}"><button type="button" class="cw-thumb" data-resume="${c.id}" aria-label="${esc(t('resumeEp', { n: c.ep }))} · ${esc(c.title)}"><img src="${esc(c.cover)}" alt="" loading="lazy"></button><div class="cw-body"><button type="button" class="card-title clamp-2" data-open="${c.id}" style="text-align:start">${esc(c.title)}</button><span class="card-sub">${esc(t('episode'))} ${c.ep}${c.total ? ` / ${c.total}` : ''}${esc(time)}</span><div class="cw-actions"><button type="button" class="btn btn-primary btn-sm" data-resume="${c.id}"><i class="ph-fill ph-play"></i>${esc(t('resume'))}</button><button type="button" class="btn btn-ghost btn-sm" data-remove-cw="${c.id}" aria-label="${esc(t('remove'))}"><i class="ph ph-trash"></i><span class="hide-mobile">${esc(t('remove'))}</span></button></div><div class="cw-bar"><span style="width:${Math.round(pct * 100)}%"></span></div></div></div>`; }
+function cwCardHTML(c, { wide = false } = {}) { const pct = c.duration ? Math.min(1, c.time / c.duration) : (c.total ? Math.min(1, c.ep / c.total) : 0); const time = c.time ? ` · ${fmtTime(c.time)}` : ''; return `<div class="cw-card${wide ? ' wide' : ''}"><button type="button" class="cw-thumb" data-resume="${c.id}" aria-label="${esc(t('resumeEp', { n: c.ep }))} · ${esc(c.title)}"><img src="${esc(c.cover)}" alt="" loading="lazy"></button><div class="cw-body"><button type="button" class="card-title clamp-2" data-open="${c.id}" style="text-align:start">${esc(c.title)}</button><span class="card-sub">${esc(t('episode'))} ${c.ep}${c.total ? ` / ${c.total}` : ''}${esc(time)}</span><div class="cw-actions"><button type="button" class="btn btn-primary btn-sm" data-resume="${c.id}"><i class="ph-fill ph-play"></i>${esc(t('resume'))}</button><button type="button" class="btn btn-ghost btn-sm" data-remove-cw="${c.id}" aria-label="${esc(t('remove'))}"><i class="ph ph-trash"></i></button></div><div class="cw-bar"><span style="width:${Math.round(pct * 100)}%"></span></div></div></div>`; }
 function fmtTime(s) { s = Math.floor(s || 0); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60; return (h ? `${h}:${String(m).padStart(2, '0')}` : `${m}`) + `:${String(sec).padStart(2, '0')}`; }
-function renderContinueRail() { const list = continueList(); const row = $('row-continue'); if (!row) return; if (state.privacy || !list.length) { row.hidden = true; return; } row.hidden = false; $('rail-continue').className = 'rail rail-wide'; $('rail-continue').innerHTML = list.slice(0, 12).map((c) => cwCardHTML(c)).join(''); }
+function renderContinueRail() { const list = continueList(); const row = $('row-continue'); if (!row) return; if (state.privacy || !list.length) { row.hidden = true; return; } row.hidden = false; $('rail-continue').className = 'rail'; $('rail-continue').innerHTML = list.slice(0, 12).map((c) => cwCardHTML(c)).join(''); }
 async function resumeContinue(id) { const c = getContinue()[id]; const m = await getMedia(id).catch(() => null); if (!m) { toast(t('loadErr'), { type: 'error' }); return; } openPlayer(m, c ? c.ep : 1); }
 
 // Busca
@@ -223,7 +220,7 @@ const SEARCH_QUERY = `query($q: String, $adult: Boolean) { Page(perPage: 40) { m
 async function runSearch(q) { q = q.trim(); $('search-h').textContent = t('searchFor', { q }); const input = $('search-input'); if (document.activeElement !== input) input.value = q; const grid = $('search-grid'); if (!q) { grid.innerHTML = emptyHTML('ph-magnifying-glass', t('searchPh')); return; } const seq = ++state.searchSeq; grid.innerHTML = skeletonCards(12); const vars = { q }; const adult = adultVar(); if (adult !== undefined) vars.adult = adult; try { const data = await gql(SEARCH_QUERY, vars); if (seq !== state.searchSeq) return; const list = remember(data.Page.media); grid.innerHTML = list.length ? list.map((m) => cardHTML(m)).join('') : emptyHTML('ph-ghost', t('searchEmpty', { q })); } catch (e) { if (seq === state.searchSeq) grid.innerHTML = errorHTML(() => runSearch(q), e); } }
 const onSearchInput = debounce((q) => { q = q.trim(); if (q.length < 2) return; const hash = '#/search?q=' + encodeURIComponent(q); if (state.view === 'search') { history.replaceState(history.state, '', hash); route(); } else location.hash = hash; }, 420);
 
-// Explorar / Filtros
+// Explorar
 const BROWSE_QUERY = `query($page: Int, $season: MediaSeason, $seasonYear: Int, $startDate_greater: FuzzyDateInt, $startDate_lesser: FuzzyDateInt, $format: MediaFormat, $genre: String, $sort: [MediaSort], $adult: Boolean) { Page(page: $page, perPage: 30) { pageInfo { hasNextPage total } media(type: ANIME, season: $season, seasonYear: $seasonYear, startDate_greater: $startDate_greater, startDate_lesser: $startDate_lesser, format: $format, genre: $genre, sort: $sort, isAdult: $adult) { ${MEDIA_FIELDS} } } }`;
 function buildFilterSelects() { 
   const yearSel = $('f-year'); 
@@ -243,7 +240,6 @@ function buildFilterSelects() {
   if (state.nsfw && !genres.includes('Hentai')) {
     genres.push('Hentai');
   }
-  
   if (!state.nsfw) {
     genres = genres.filter((g) => g !== 'Hentai');
   }
@@ -255,11 +251,32 @@ function buildFilterSelects() {
   if (chips) chips.innerHTML = QUICK_GENRES.map((g) => `<button type="button" class="chip" data-genre="${esc(g)}" aria-pressed="${genreSel.value === g}">${esc(g)}</button>`).join(''); 
 }
 async function loadGenres() { try { const d = await gql('{ GenreCollection }', {}, { persist: 7 * 24 * 3600 * 1000 }); if (Array.isArray(d.GenreCollection) && d.GenreCollection.length) { state.genres = d.GenreCollection; buildFilterSelects(); } } catch (e) {} }
-function browseVars(page) { const year = Number($('f-year').value) || null; const season = $('f-season').value || null; const format = $('f-format').value || null; const genre = $('f-genre').value || null; const sortValue = $('f-sort').value || 'POPULARITY_DESC'; const vars = { page, sort: [sortValue] }; const adult = adultVar(); if (adult !== undefined) vars.adult = adult; if (format) vars.format = format; if (genre) vars.genre = genre; if (season && year) { vars.season = season; vars.seasonYear = year; } else if (year) { vars.startDate_greater = year * 10000; vars.startDate_lesser = (year + 1) * 10000; } else if (season) { vars.season = season; } return vars; }
+function browseVars(page) { 
+  const year = Number($('f-year').value) || null; 
+  const season = $('f-season').value || null; 
+  const format = $('f-format').value || null; 
+  const genre = $('f-genre').value || null; 
+  const sortValue = $('f-sort').value || 'POPULARITY_DESC'; 
+  const vars = { page, sort: [sortValue] }; 
+  
+  if (genre === 'Hentai') {
+    vars.adult = true;
+  } else {
+    const adult = adultVar(); 
+    if (adult !== undefined) vars.adult = adult; 
+  }
+  
+  if (format) vars.format = format; 
+  if (genre) vars.genre = genre; 
+  if (season && year) { vars.season = season; vars.seasonYear = year; } 
+  else if (year) { vars.startDate_greater = year * 10000; vars.startDate_lesser = (year + 1) * 10000; } 
+  else if (season) { vars.season = season; } 
+  return vars; 
+}
 async function loadBrowse(reset) { const b = state.browse; if (reset) { b.page = 1; b.seq++; b.ok = false; } const seq = b.seq; const grid = $('browse-grid'); const more = $('browse-more'); if (reset) grid.innerHTML = skeletonCards(18); b.loading = true; more.disabled = true; try { const vars = browseVars(b.page); const data = await gql(BROWSE_QUERY, vars); if (seq !== b.seq) { b.loading = false; return; } const pageInfo = data.Page.pageInfo; const list = remember(data.Page.media); b.hasNext = pageInfo.hasNextPage; $('browse-count').textContent = t('titles', { n: (pageInfo.total || 0).toLocaleString(state.lang) }); if (reset) grid.innerHTML = list.length ? list.map((m) => cardHTML(m)).join('') : emptyHTML('ph-magnifying-glass', t('noResults')); else if (list.length) grid.insertAdjacentHTML('beforeend', list.map((m) => cardHTML(m)).join('')); more.hidden = !b.hasNext; b.ok = true; } catch (e) { if (reset && seq === b.seq) grid.innerHTML = errorHTML(() => loadBrowse(true), e); else { if (!reset) b.page = Math.max(1, b.page - 1); toast(t('loadErr'), { type: 'error' }); } } finally { b.loading = false; more.disabled = false; } }
 async function getMedia(id) { const hit = state.media.get(id); if (hit && hit._full) return hit; const data = await gql(`query($id: Int) { Media(id: $id) { ${MEDIA_FIELDS} description siteUrl trailer { id site } relations { edges { relationType node { ${MEDIA_FIELDS} } } } } }`, { id }); if (!data || !data.Media) throw new Error('not found'); data.Media._full = true; remember([data.Media]); return state.media.get(id); }
 
-// Camadas (Modais)
+// Camadas
 const LAYER_Z = { detail: 50, player: 60, trailer: 65, settings: 75, shortcuts: 75, maintenance: 80, onboarding: 90 };
 const STICKY_LAYERS = ['maintenance', 'onboarding'];
 function isOpen(id) { return state.stack.includes(id); }
@@ -316,35 +333,42 @@ async function playAnime(id) { try { const m = await getMedia(id); if (releasedE
 function startEpisode(n) { if (state.detail) openPlayer(state.detail, n); }
 function openPlayer(anime, ep) {
   const isAdult = anime.isAdult === true;
-  const list = orderedServers(isAdult);
-  if (!list.length) { 
-    toast(t('noServer'), { type: 'error', action: { label: t('settings'), run: () => openLayer('settings') } }); 
-    return; 
-  }
-  
-  if (isAdult) {
-    window.open(`https://hanime.tv/search?q=${encodeURIComponent(titleOf(anime))}`, '_blank');
-    toast('Player +18 aberto em nova aba (provedores externos não permitem embed).', { type: 'info' });
-    return;
-  }
-
   remember([anime]); 
   const audio = lsGet(K.audio, 'sub') === 'dub' ? 'dub' : 'sub'; 
-  state.player = { anime, ep, server: list[0].id, audio, url: '' }; 
+  state.player = { anime, ep, server: '', audio, url: '' }; 
   saveContinue(anime, ep); 
   markWatched(anime.id, ep); 
   syncProgress(anime, ep); 
   openLayer('player', '#p-next'); 
   paintPlayerChrome(); 
+  
+  if (isAdult) {
+    $('stage-adult').hidden = false;
+    $('embed-player').style.display = 'none';
+    $('stage-loading').style.display = 'none';
+    $('stage-hint').style.display = 'none';
+    $('p-adult-link').href = `https://hanime.tv/search?q=${encodeURIComponent(titleOf(anime))}`;
+    return;
+  }
+
+  $('stage-adult').hidden = true;
+  $('embed-player').style.display = 'block';
+  
+  const list = orderedServers(isAdult);
+  if (!list.length) { 
+    toast(t('noServer'), { type: 'error', action: { label: t('settings'), run: () => openLayer('settings') } }); 
+    return; 
+  }
+  state.player.server = list[0].id;
   loadStream(); 
 }
-function loadStream() { const p = state.player; if (!p) return; clearTimeout(state.hintTimer); $('stage-hint').hidden = true; const overlay = $('stage-loading'); overlay.classList.remove('gone'); const frame = $('embed-player'); const list = orderedServers(); let start = list.findIndex((s) => s.id === p.server); if (start < 0) start = 0; let warned = false; for (let i = 0; i < list.length; i++) { const s = list[(start + i) % list.length]; const url = embedUrl(s, p.anime, p.ep, p.audio); if (!url) { if (!warned) { toast(t('serverSkip', { s: s.label })); warned = true; } continue; } p.server = s.id; p.url = url; frame.src = url; $('p-direct').href = url; paintPlayerChrome(); state.hintTimer = setTimeout(() => { overlay.classList.add('gone'); $('stage-hint').hidden = false; }, EMBED_TIMEOUT_MS); return; } overlay.classList.add('gone'); frame.src = 'about:blank'; $('p-direct').removeAttribute('href'); toast(t('noServer'), { type: 'error' }); paintPlayerChrome(); }
+function loadStream() { const p = state.player; if (!p || p.anime.isAdult) return; clearTimeout(state.hintTimer); $('stage-hint').hidden = true; const overlay = $('stage-loading'); overlay.classList.remove('gone'); const frame = $('embed-player'); const list = orderedServers(); let start = list.findIndex((s) => s.id === p.server); if (start < 0) start = 0; let warned = false; for (let i = 0; i < list.length; i++) { const s = list[(start + i) % list.length]; const url = embedUrl(s, p.anime, p.ep, p.audio); if (!url) { if (!warned) { toast(t('serverSkip', { s: s.label })); warned = true; } continue; } p.server = s.id; p.url = url; frame.src = url; $('p-direct').href = url; paintPlayerChrome(); state.hintTimer = setTimeout(() => { overlay.classList.add('gone'); $('stage-hint').hidden = false; }, EMBED_TIMEOUT_MS); return; } overlay.classList.add('gone'); frame.src = 'about:blank'; $('p-direct').removeAttribute('href'); toast(t('noServer'), { type: 'error' }); paintPlayerChrome(); }
 function stopPlayer() { clearTimeout(state.hintTimer); $('embed-player').src = 'about:blank'; state.player = null; $('stage-hint').hidden = true; $('stage-loading').classList.remove('gone'); if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {}); renderContinueRail(); if (state.view === 'list') renderList(); if (state.detail) renderDetail(state.detail); }
-function paintPlayerChrome() { const p = state.player; if (!p) return; const total = totalEpisodes(p.anime); const released = releasedEpisodes(p.anime); $('p-title').textContent = titleOf(p.anime); $('p-sub').textContent = `${t('episode')} ${p.ep}${total ? ' / ' + total : ''}`; const sel = $('p-episode'); const max = Math.max(released, p.ep); const sig = `${p.anime.id}:${max}`; if (sel.dataset.sig !== sig) { sel.innerHTML = Array.from({ length: max }, (_, i) => `<option value="${i + 1}">${t('ep')} ${i + 1}</option>`).join(''); sel.dataset.sig = sig; } sel.value = String(p.ep); qsa('#p-audio [data-audio]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.audio === p.audio))); const servers = orderedServers(); const box = $('p-servers'); const ssig = servers.map((s) => s.id).join('|'); if (box.dataset.sig !== ssig) { box.innerHTML = servers.map((s) => `<button type="button" class="srv" role="radio" data-srv="${esc(s.id)}">${esc(s.label)}</button>`).join(''); box.dataset.sig = ssig; } qsa('.srv', box).forEach((b) => b.setAttribute('aria-checked', String(b.dataset.srv === p.server))); $('p-prev').disabled = p.ep <= 1; }
+function paintPlayerChrome() { const p = state.player; if (!p) return; const total = totalEpisodes(p.anime); const released = releasedEpisodes(p.anime); $('p-title').textContent = titleOf(p.anime); $('p-sub').textContent = `${t('episode')} ${p.ep}${total ? ' / ' + total : ''}`; const sel = $('p-episode'); const max = Math.max(released, p.ep); const sig = `${p.anime.id}:${max}`; if (sel.dataset.sig !== sig) { sel.innerHTML = Array.from({ length: max }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join(''); sel.dataset.sig = sig; } sel.value = String(p.ep); qsa('#p-audio [data-audio]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.audio === p.audio))); const servers = orderedServers(p.anime.isAdult); const box = $('p-servers'); const ssig = servers.map((s) => s.id).join('|'); if (box.dataset.sig !== ssig) { box.innerHTML = servers.map((s) => `<button type="button" class="srv" role="radio" data-srv="${esc(s.id)}">${esc(s.label)}</button>`).join(''); box.dataset.sig = ssig; } qsa('.srv', box).forEach((b) => b.setAttribute('aria-checked', String(b.dataset.srv === p.server))); $('p-prev').disabled = p.ep <= 1; }
 function changeEpisode(n) { const p = state.player; if (!p || n < 1) return; if (n > releasedEpisodes(p.anime)) { toast(t('lastEp')); paintPlayerChrome(); return; } p.ep = n; saveContinue(p.anime, n); markWatched(p.anime.id, n); syncProgress(p.anime, n); loadStream(); paintPlayerChrome(); }
 function toggleFullscreen() { if (document.fullscreenElement) { document.exitFullscreen().catch(() => {}); return; } const el = $('player-shell'); const req = el.requestFullscreen || el.webkitRequestFullscreen; if (req) { const r = req.call(el); if (r && r.catch) r.catch(() => {}); } }
 
-// Minha Lista
+// Lista
 const AL_FILTERS = ['CURRENT', 'PLANNING', 'COMPLETED', 'PAUSED', 'DROPPED'];
 const AL_LIST_QUERY = `query($uid: Int, $st: MediaListStatus) { MediaListCollection(userId: $uid, type: ANIME, status: $st, sort: UPDATED_TIME_DESC) { lists { entries { progress media { ${MEDIA_FIELDS} } } } } }`;
 function renderList() { const cont = continueList(); $('list-continue').innerHTML = cont.length ? cont.map((c) => cwCardHTML(c, { wide: true })).join('') : emptyHTML('ph-play-circle', t('emptyContinue')); const favs = getFavs(); $('list-favs').innerHTML = favs.length ? favs.map((m) => cardHTML(m)).join('') : emptyHTML('ph-heart', t('emptyFavs')); remember(favs.map((f) => Object.assign({ coverImage: f.coverImage }, f))); renderAniListBlock(); }
@@ -357,7 +381,7 @@ function scrollRail(id, dir) { const rail = $('rail-' + id); if (!rail) return; 
 const SURPRISE_QUERY = `query($page: Int, $adult: Boolean) { Page(page: $page, perPage: 50) { media(type: ANIME, averageScore_greater: 78, sort: POPULARITY_DESC, isAdult: $adult) { ${MEDIA_FIELDS} } } }`;
 async function surprise() { const vars = { page: 1 + Math.floor(Math.random() * 6) }; const adult = adultVar(); if (adult !== undefined) vars.adult = adult; try { const d = await gql(SURPRISE_QUERY, vars); const list = remember(d.Page.media); if (!list.length) throw new Error('empty'); openDetail(list[Math.floor(Math.random() * list.length)].id); } catch (e) { toast(t('loadErr'), { type: 'error' }); } }
 
-// Tagline / UI
+// UI e Configurações
 let taglineObserver = null;
 function renderTagline() { const box = $('tagline-text'); if (!box) return; const lines = String(t('tagline')).split('|'); box.innerHTML = lines.map((line) => { const words = /\s/.test(line.trim()) ? line.trim().split(/\s+/) : (line.match(/[A-Za-z0-9’']+|\S/gu) || []); const spaced = /\s/.test(line.trim()); return '<span style="display:block">' + words.map((w) => `<span class="w${/loft/i.test(w) ? ' loft' : ''}">${esc(w)}</span>`).join(spaced ? ' ' : '') + '</span>'; }).join(''); const all = qsa('.w', box); if (taglineObserver) taglineObserver.disconnect(); if (reduceMotion() || !('IntersectionObserver' in window)) { all.forEach((w) => w.classList.add('on')); return; } taglineObserver = new IntersectionObserver((entries) => { if (!entries.some((e) => e.isIntersecting)) return; all.forEach((w, i) => setTimeout(() => w.classList.add('on'), i * 110)); taglineObserver.disconnect(); }, { threshold: 0.4 }); taglineObserver.observe(box); }
 function detectDevice() { const ua = navigator.userAgent || ''; if (/SMART-TV|SmartTV|Tizen|Web0S|WebOS|NetCast|HbbTV|PlayStation|Xbox|Nintendo|AFTB|AFTS|AFTM|CrKey|BRAVIA|Roku|VIDAA/i.test(ua)) return 'tv'; const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches; if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua) || (coarse && Math.min(screen.width, screen.height) < 900)) return 'mobile'; return 'pc'; }
@@ -366,10 +390,10 @@ function pickDevice(mode) { setDevice(mode); closeLayer('onboarding'); }
 function setTheme(name) { if (!['dark', 'oled', 'sky'].includes(name)) name = 'dark'; state.theme = name; document.documentElement.dataset.theme = name; lsSet(K.theme, name); const meta = document.querySelector('meta[name="theme-color"]'); const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(); if (meta && bg) meta.setAttribute('content', bg); paintSettings(); }
 function paintSettings() { qsa('#s-device button[data-device]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.device === state.device))); qsa('#s-theme [data-theme-opt]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.themeOpt === state.theme))); if ($('s-lang')) $('s-lang').value = state.lang; if ($('s-nsfw')) $('s-nsfw').checked = state.nsfw; if ($('s-privacy')) $('s-privacy').checked = state.privacy; const embeds = state.config.servers.filter((s) => s.type === 'embed' && s.enabled !== false); if ($('s-default-server')) { $('s-default-server').innerHTML = embeds.map((s) => `<option value="${esc(s.id)}">${esc(s.label)}</option>`).join(''); $('s-default-server').value = state.prefs.default && embeds.some((s) => s.id === state.prefs.default) ? state.prefs.default : (embeds[0] ? embeds[0].id : ''); } if ($('s-servers')) { $('s-servers').innerHTML = embeds.map((s) => { let host = ''; try { host = new URL(s.url.replace(/\{\w+\}/g, '1')).hostname; } catch (e) {} return `<li class="toggle-row"><div><span class="body-5">${esc(s.label)}</span><p class="caption-5 muted">${esc(host)}</p></div><input type="checkbox" class="switch" role="switch" data-srv-toggle="${esc(s.id)}" ${state.prefs.enabled[s.id] === false ? '' : 'checked'}></li>`; }).join(''); } if ($('s-al-hint')) $('s-al-hint').textContent = t('alHint'); if ($('s-client-id')) $('s-client-id').value = lsGet(K.clientId) || CONFIG.anilistClientId || ''; if ($('s-redirect')) $('s-redirect').textContent = location.origin + location.pathname; if ($('s-al-login')) $('s-al-login').hidden = Boolean(state.viewer); if ($('s-al-logout')) $('s-al-logout').hidden = !state.viewer; if ($('s-version')) $('s-version').textContent = t('version', { v: APP_VERSION }); }
 function savePrefs() { lsSetJSON(K.servers, state.prefs); }
-function resetCatalog() { pruneQueryCache(true); homeData = null; if ($('browse-grid')) $('browse-grid').innerHTML = ''; buildFilterSelects(); route(); }
+function resetCatalog() { homeData = null; if ($('browse-grid')) $('browse-grid').innerHTML = ''; buildFilterSelects(); route(); }
 function clearHistory() { lsDel(K.cont); lsDel(K.watched); renderContinueRail(); if (state.view === 'list') renderList(); if (state.detail) renderDetail(state.detail); toast(t('historyCleared'), { type: 'ok' }); }
 
-// Auth (AniList)
+// Auth
 function readToken() { const exp = Number(lsGet(K.tokenExp) || 0); const token = lsGet(K.token); if (token && exp > Date.now()) return token; if (token) { lsDel(K.token); lsDel(K.tokenExp); } return null; }
 function captureToken() { if (!/access_token=/.test(location.hash)) return false; const p = new URLSearchParams(location.hash.replace(/^#\/?/, '')); const token = p.get('access_token'); if (token) { lsSet(K.token, token); lsSet(K.tokenExp, String(Date.now() + (Number(p.get('expires_in')) || 31536000) * 1000)); } history.replaceState(null, '', location.pathname + location.search + '#/home'); return Boolean(token); }
 function startLogin() { const id = (lsGet(K.clientId) || CONFIG.anilistClientId || '').trim(); if (!/^\d+$/.test(id)) { toast(t('alNeedId'), { type: 'error' }); openLayer('settings', '#s-client-id'); return; } location.href = `https://anilist.co/api/v2/oauth/authorize?client_id=${encodeURIComponent(id)}&response_type=token`; }
@@ -386,17 +410,19 @@ function showMaintenance(message) { $('m-msg').textContent = pickMessage(message
 function hideMaintenance() { clearInterval(state.maintTimer); closeLayer('maintenance'); }
 async function loadServersConfig() { let cfg = null; let fresh = false; try { const r = await fetch(`${SERVERS_URL}?t=${Date.now()}`, { cache: 'no-store' }); if (!r.ok) throw new Error('HTTP ' + r.status); cfg = validateConfig(await r.json()); if (!cfg) throw new Error('invalid'); fresh = true; lsSetJSON(K.serversCache, cfg); } catch (e) { cfg = validateConfig(lsJSON(K.serversCache, null)) || validateConfig(DEFAULT_SERVERS); } state.config = cfg; if (fresh && cfg.maintenance) showMaintenance(cfg.message); else if (isOpen('maintenance')) { hideMaintenance(); resetCatalog(); } paintSettings(); }
 
-// Acessibilidade / Teclado
+// Navegação Teclado
 function focusablesIn(root) { return qsa('a[href], button:not([disabled]), select:not([disabled]), input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])', root).filter((el) => el.getClientRects().length && !el.closest('[hidden]') && getComputedStyle(el).visibility !== 'hidden'); }
 function spatialMove(key) { const top = topLayer(); const root = top ? $(top) : document.body; const list = focusablesIn(root).filter((el) => top || !el.closest('#mascot, .skip-link')); if (!list.length) return false; const cur = document.activeElement; if (!cur || cur === document.body || !list.includes(cur)) { list[0].focus(); return true; } const r = cur.getBoundingClientRect(); const cx = r.left + r.width / 2; const cy = r.top + r.height / 2; const horizontal = key === 'ArrowLeft' || key === 'ArrowRight'; let best = null; let bestScore = Infinity; list.forEach((el) => { if (el === cur) return; const b = el.getBoundingClientRect(); const dx = b.left + b.width / 2 - cx; const dy = b.top + b.height / 2 - cy; const ok = key === 'ArrowRight' ? dx > 4 : key === 'ArrowLeft' ? dx < -4 : key === 'ArrowDown' ? dy > 4 : dy < -4; if (!ok) return; const score = (horizontal ? Math.abs(dx) : Math.abs(dy)) + (horizontal ? Math.abs(dy) : Math.abs(dx)) * 2.5; if (score < bestScore) { bestScore = score; best = el; } }); if (!best) return false; best.focus({ preventScroll: true }); best.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: reduceMotion() ? 'auto' : 'smooth' }); return true; }
 function trapTab(e) { const top = topLayer(); if (!top) return; const items = focusablesIn($(top)); if (!items.length) return; const first = items[0]; const last = items[items.length - 1]; if (!$(top).contains(document.activeElement)) { e.preventDefault(); first.focus(); } else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); } else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); } }
 function syncChrome() { const root = document.documentElement.style; const nav = $('navbar'); const tab = $('tabbar'); if (!nav || !tab) return; const measure = () => { root.setProperty('--nav-h', `${nav.offsetHeight}px`); root.setProperty('--tab-h', getComputedStyle(tab).display === 'none' ? '0px' : `${tab.offsetHeight}px`); }; measure(); if ('ResizeObserver' in window) { const ro = new ResizeObserver(measure); ro.observe(nav); ro.observe(tab); } window.addEventListener('resize', measure); window.addEventListener('orientationchange', measure); if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure); }
 function focusSearch() { const nav = $('navbar'); if (getComputedStyle($('search-form')).display === 'none') nav.classList.add('search-open'); $('search-input').focus(); $('search-input').select(); }
 function onKey(e) { if (e.key === 'Escape') { if (!$('account-menu').hidden) { closeAccountMenu(); return; } if (closeTopLayer()) { e.preventDefault(); return; } $('navbar').classList.remove('search-open'); return; } if (e.ctrlKey || e.metaKey || e.altKey) return; if (e.key === 'Tab') { trapTab(e); return; } const el = document.activeElement || document.body; const tag = el.tagName; const typing = tag === 'TEXTAREA' || (tag === 'INPUT' && !/^(checkbox|radio|button|submit|reset)$/.test(el.type)) || el.isContentEditable; if (typing) return; if (e.key === '/') { e.preventDefault(); focusSearch(); return; } if (isOpen('player') && !isOpen('settings') && !isOpen('trailer')) { if (e.key === 'f' || e.key === 'F') { e.preventDefault(); toggleFullscreen(); return; } if (e.key === 'n' || e.key === 'N') { e.preventDefault(); changeEpisode(state.player.ep + 1); return; } if (e.key === 'p' || e.key === 'P') { e.preventDefault(); changeEpisode(state.player.ep - 1); return; } } if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) { if (tag === 'SELECT' && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) return; const interactive = el !== document.body && el.matches && el.matches('a, button, [tabindex], select, input'); if (!interactive && state.device !== 'tv') return; if (spatialMove(e.key)) e.preventDefault(); } }
+
 function onClick(e) { const q = (sel) => e.target.closest(sel); let el; if ((el = q('[data-close]'))) { const layer = el.closest('.layer'); if (layer) closeLayer(layer.id); return; } if ((el = q('[data-remove-cw]'))) { removeContinue(el.dataset.removeCw); renderContinueRail(); if (state.view === 'list') renderList(); return; } if ((el = q('[data-resume]'))) { resumeContinue(Number(el.dataset.resume)); return; } if ((el = q('[data-play]'))) { playAnime(Number(el.dataset.play)); return; } if ((el = q('[data-open]'))) { openDetail(Number(el.dataset.open)); return; } if ((el = q('[data-scroll]'))) { scrollRail(el.dataset.scroll, Number(el.dataset.dir)); return; } if ((el = q('[data-dot]'))) { heroGo(Number(el.dataset.dot)); return; } if ((el = q('[data-genre]'))) { pickGenre(el.dataset.genre); return; } if ((el = q('[data-ep]'))) { startEpisode(Number(el.dataset.ep)); return; } if ((el = q('[data-open-settings]'))) { openLayer('settings'); return; } if ((el = q('[data-pick-device]'))) { pickDevice(el.dataset.pickDevice); return; } if (!q('#account-menu') && !q('#btn-account')) closeAccountMenu(); }
 
 function bindEvents() {
   document.addEventListener('click', onClick); document.addEventListener('keydown', onKey); window.addEventListener('hashchange', route);
+  window.addEventListener('scroll', () => { const nav = $('navbar'); if (window.scrollY > 50) nav.classList.add('scrolled'); else nav.classList.remove('scrolled'); });
   window.addEventListener('offline', () => toast(t('offline'), { type: 'error' }));
   window.addEventListener('online', () => { toast(t('online'), { type: 'ok' }); if (!state.homeLoaded && state.view === 'home') loadHome(true); });
   const input = $('search-input');
