@@ -8,6 +8,8 @@ window.LOFT_I18N = {
   ],
   strings: {
     en: {
+       tipDiscord: 'Join our Discord community to report issues and suggest features!',
+tipGithub: 'The project is open source. Check out our GitHub!',
       skip: 'Skip to content', home: 'Home', browse: 'Browse', myList: 'My list', settings: 'Settings',
       searchPh: 'Search anime', surprise: 'Surprise me', login: 'Sign in', logout: 'Sign out', profile: 'AniList profile',
       seeAll: 'See all', clear: 'Clear', continueWatching: 'Continue watching', rowTrending: 'Trending now', rowSeason: 'Popular this season', rowAiring: 'Airing now',
@@ -59,6 +61,8 @@ window.LOFT_I18N = {
     },
 
     pt: {
+       tipDiscord: 'Junte-se à nossa comunidade no Discord para reportar problemas e sugerir novos recursos!',
+tipGithub: 'O código do projeto é aberto. Dê uma olhada no nosso GitHub!',
       skip: 'Pular para o conteúdo', home: 'Início', browse: 'Explorar', myList: 'Minha lista', settings: 'Configurações',
       searchPh: 'Buscar anime', surprise: 'Surpreenda-me', login: 'Entrar', logout: 'Sair', profile: 'Perfil no AniList',
       seeAll: 'Ver tudo', clear: 'Limpar', continueWatching: 'Continuar assistindo', rowTrending: 'Em alta agora', rowSeason: 'Populares nesta temporada', rowAiring: 'Em exibição',
