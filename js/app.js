@@ -100,9 +100,43 @@ async function gqlFetch(query, variables, useAuth) {
   for (let attempt = 0; ; attempt++) {
     if (navigator.onLine === false) throw apiError('offline');
     await acquireSlot(); const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 25000); let res;
-    try { res = await fetch(ANILIST_API, { method: 'POST', headers, body: JSON.stringify({ query, variables }), signal: ctrl.signal }); } catch (e) { clearTimeout(timer); if (attempt >= waits.length) throw apiError('network'); await sleep(waits[attempt]); continue; }
+    try { 
+      res = await fetch(ANILIST_API, { 
+        method: 'POST', 
+        headers, 
+        body: JSON.stringify({ query, variables }), 
+        signal: ctrl.signal,
+        cache: 'no-store'
+      }); 
+    } catch (e) { 
+      clearTimeout(timer); 
+      if (attempt >= waits.length) throw apiError('network'); 
+      await sleep(waits[attempt]); 
+      continue; 
+    }
     clearTimeout(timer);
-    if (res.status === 429 || res.status >= 500) { if (attempt >= waits.length) throw apiError('rate'); await sleep(waits[attempt]); continue; }
+    
+    // Tratamento específico para 429 (Rate Limit)
+    if (res.status === 429) {
+      const resetAt = res.headers.get('X-RateLimit-Reset');
+      if (resetAt) {
+        const waitMs = (Number(resetAt) * 1000) - Date.now();
+        if (waitMs > 0 && waitMs < 120000) { // Espera no máximo 2 minutos
+          await sleep(waitMs + 1000);
+          continue;
+        }
+      }
+      if (attempt >= waits.length) throw apiError('rate');
+      await sleep(waits[attempt]);
+      continue;
+    }
+    
+    if (res.status >= 500) { 
+      if (attempt >= waits.length) throw apiError('rate'); 
+      await sleep(waits[attempt]); 
+      continue; 
+    }
+    
     const json = await res.json().catch(() => ({}));
     if (res.status === 401 || (json.errors || []).some((e) => e.status === 401)) { if (useAuth) logout(true); throw apiError('auth'); }
     if (!res.ok || json.errors) throw apiError('api', json.errors ? json.errors[0].message : 'API error');
